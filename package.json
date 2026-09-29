@@ -1,1 +1,1 @@
-{"name":"dugout-manager","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"node server.mjs","test":"node --test tests/*.test.mjs"}}
+{"name":"dugout-manager","version":"0.2.0","private":true,"type":"module","scripts":{"dev":"node server.mjs","build:engine":"node scripts/build-engine.mjs","build":"npm run build:engine && node scripts/build.mjs","test":"node --test tests/*.test.mjs && node scripts/test-upstream.mjs","test:league":"node tests/upstream-runtime/league-test.js"},"devDependencies":{"typescript":"5.9.3"}}
