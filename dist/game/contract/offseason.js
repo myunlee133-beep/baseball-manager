@@ -33,7 +33,9 @@ export function nextStep(state){
     aiReleaseOverflow(state);
     if(rosterProblems(state).over.length)return false;
     retireUnsigned(state);
+    const ret=o.retired??[],n=ret.length,year=o.year;
     prepareNextSeason(state);
+    if(n)state.season.news.push(`${year} 오프시즌 은퇴 ${n}명: ${ret.slice(0,10).map(r=>`${teams[r.team]} ${r.name}`).join(', ')}${n>10?` 외 ${n-10}명`:''}`);
     state.offseason=null;
     return true;
   }

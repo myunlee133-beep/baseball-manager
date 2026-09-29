@@ -50,6 +50,7 @@ export function signFreeAgent(state,id){
   const k=(o.freeAgents??=[]).findIndex(p=>p.id===id);
   if(k<0)return {ok:false,reason:'자유계약 시장에 없는 선수입니다.'};
   if(state.players.length>=FILL.max)return {ok:false,reason:`로스터 ${FILL.max}명이 찼습니다.`};
+  if(o.freeAgents[k].foreign)return {ok:false,reason:'외국인 선수는 자유계약 시장에서 영입할 수 없습니다.'};
   const p=o.freeAgents[k],salary=askingSalary(p),check=canAfford(state,0,{salary});
   if(!check.ok)return check;
   o.freeAgents.splice(k,1);
@@ -64,6 +65,7 @@ export function aiReleaseOverflow(state){
   for(let team=1;team<teams.length;team++){
     while(teamPlayers(state,team).length>FILL.max){
       const p=teamPlayers(state,team).filter(x=>!x.foreign).sort((a,b)=>a.ovr-b.ovr)[0];
+      if(!p)break;
       removeFromTeam(state,team,p.id);
       (o.freeAgents??=[]).push(toFreeAgent(p,team));
       n++;

@@ -28,7 +28,7 @@ function stepBody(state,step,{standingsTable,problems}){
   if(step==='roster'){
     const over=problems.over.length?`<p style="color:var(--red)">55명을 넘는 구단: ${problems.over.map(t=>`${teams[t.team]} ${t.count}명`).join(', ')}</p>`:`<p>모든 구단이 ${FILL.max}명 이하입니다.</p>`;
     const warn=problems.warnings.map(w=>`<p style="color:var(--gold)">${w}</p>`).join('');
-    const market=playerTable([...(o.freeAgents??[])].sort((a,b)=>b.ovr-a.ovr),[['선수',p=>p.name],['원소속',p=>teams[p.fromTeam]],['포지션',p=>p.pos],['나이',p=>p.age],['OVR',p=>p.ovr],['요구 연봉',p=>money(askingSalary(p))]],p=>`<button class="secondary" data-sign="${p.id}">영입</button>`,'자유계약 시장에 선수가 없습니다.');
+    const market=playerTable([...(o.freeAgents??[])].sort((a,b)=>b.ovr-a.ovr),[['선수',p=>p.name],['원소속',p=>teams[p.fromTeam]],['포지션',p=>p.pos],['나이',p=>p.age],['OVR',p=>p.ovr],['요구 연봉',p=>money(askingSalary(p))]],p=>p.foreign?'-':`<button class="secondary" data-sign="${p.id}">영입</button>`,'자유계약 시장에 선수가 없습니다.');
     return `<div class="offnote">${over}${warn}<p class="muted">새 시즌을 시작하면 ${o.year+1} 일정이 만들어집니다. 시장에 남은 선수는 은퇴합니다.</p><p><strong>자유계약 시장</strong></p></div>${market}<div class="offnote"><p><strong>내 팀 방출</strong></p></div>${releaseTable(state)}`;
   }
   return '<div class="empty">이 단계는 다음 업데이트에서 추가됩니다.</div>';

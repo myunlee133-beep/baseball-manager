@@ -99,3 +99,14 @@ test('미계약자 은퇴와 시장 선수 노화',()=>{
   assert.deepEqual(s.offseason.freeAgents,[]);
   assert.match(s.offseason.log.at(-1),/2명/);
 });
+
+test('외국인 방출 선수는 자유계약 시장에서 영입할 수 없다',()=>{
+  const s=off('retire'),f=s.players.find(p=>p.foreign);
+  assert.ok(f);
+  assert.equal(releasePlayer(s,f.id),true);
+  s.offseason.step='roster';
+  const r=signFreeAgent(s,f.id);
+  assert.deepEqual(r,{ok:false,reason:'외국인 선수는 자유계약 시장에서 영입할 수 없습니다.'});
+  assert.ok(s.offseason.freeAgents.some(p=>p.id===f.id));
+  assert.ok(!s.players.some(p=>p.id===f.id));
+});

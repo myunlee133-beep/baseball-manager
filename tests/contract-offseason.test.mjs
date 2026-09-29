@@ -79,7 +79,9 @@ test('AI 구단이 55명을 넘으면 ⑥을 떠날 때 자동 방출되고, 시
   beginOffseason(s);
   while(s.offseason.step!=='roster')nextStep(s);
   for(let i=0;i<6;i++)s.league[3].push({...structuredClone(s.league[3].at(-1)),id:`3-extra-${i}`,ovr:99});
+  const log=s.offseason.log;
   assert.equal(nextStep(s),true);
+  assert.ok(log.some(l=>/미계약 자유계약 선수 \d+명 은퇴/.test(l)));
   assert.equal(s.league[3].length,55);
   assert.equal(s.offseason,null);
   assert.equal(s.season.year,2027);
@@ -143,4 +145,11 @@ test('② 탭을 지난 단계에서 다시 열면 방출 버튼이 없다',()=>
   assert.equal(s.offseason.step,'salary');
   const panel=(t,b)=>`<section><h2>${t}</h2>${b}</section>`;
   assert.doesNotMatch(offseasonMarkup(s,{tab:'retire',panel,standingsTable:()=>''}),/data-release=/);
+});
+
+test('새 시즌 뉴스에 오프시즌 은퇴 한 줄이 남는다',()=>{
+  const s=ended();
+  beginOffseason(s);
+  while(s.offseason)nextStep(s);
+  assert.ok(s.season.news.some(l=>/오프시즌 은퇴/.test(l)));
 });
