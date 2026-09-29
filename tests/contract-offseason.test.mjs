@@ -136,3 +136,11 @@ test('② 화면: 은퇴 목록과 내 팀 방출 버튼, ⑥ 화면: 자유계�
   assert.match(six,new RegExp(`data-sign="${id}"`));
   assert.match(six,/data-release=/);
 });
+
+test('② 탭을 지난 단계에서 다시 열면 방출 버튼이 없다',()=>{
+  const s=ended();
+  beginOffseason(s);nextStep(s);nextStep(s);
+  assert.equal(s.offseason.step,'salary');
+  const panel=(t,b)=>`<section><h2>${t}</h2>${b}</section>`;
+  assert.doesNotMatch(offseasonMarkup(s,{tab:'retire',panel,standingsTable:()=>''}),/data-release=/);
+});

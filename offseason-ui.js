@@ -15,7 +15,7 @@ function playerTable(rows,cols,action,empty){
   const cell=v=>`<td style="font-variant-numeric:tabular-nums">${v}</td>`;
   return `<div class="tablewrap"><table><thead><tr>${cols.map(([l])=>`<th>${l}</th>`).join('')}<th></th></tr></thead><tbody>${rows.map(p=>`<tr>${cols.map(([,f])=>cell(f(p))).join('')}<td>${action(p)}</td></tr>`).join('')}</tbody></table></div>`;
 }
-const releaseTable=state=>playerTable([...state.players].sort((a,b)=>a.ovr-b.ovr),[['선수',p=>p.name],['포지션',p=>p.pos],['나이',p=>p.age],['OVR',p=>p.ovr],['연봉',p=>p.contract?money(p.contract.salary):'-'],['구분',p=>p.group==='first'?'1군':p.group==='second'?'2군':'부상']],p=>`<button class="secondary" data-release="${p.id}">방출</button>`,'선수가 없습니다.');
+const releaseTable=state=>playerTable([...state.players].sort((a,b)=>a.ovr-b.ovr),[['선수',p=>p.name],['포지션',p=>p.pos],['나이',p=>p.age],['OVR',p=>p.ovr],['연봉',p=>p.contract?money(p.contract.salary):'-'],['구분',p=>p.group==='first'?'1군':p.group==='second'?'2군':'부상']],p=>['retire','roster'].includes(state.offseason.step)?`<button class="secondary" data-release="${p.id}">방출</button>`:'-','선수가 없습니다.');
 
 function stepBody(state,step,{standingsTable,problems}){
   const o=state.offseason;
