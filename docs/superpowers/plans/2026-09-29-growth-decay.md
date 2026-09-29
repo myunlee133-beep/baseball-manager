@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 2단계의 빈 훅 `monthlyTick`·`offseasonTick`을 채워 410명 전원의 능력치를 나이 곡선대로 성장·하락시키고, 결과를 공용 받은편지함의 스카우트 리포트로 보여준다.
+**Goal:** 2단계의 빈 훅 `monthlyTick`·`offseasonTick`을 채워 550명 전원(실제 410 + 가상·외국인 140)의 능력치를 나이 곡선대로 성장·하락시키고, 결과를 공용 받은편지함의 스카우트 리포트로 보여준다.
 
 **Architecture:** 성장 로직은 새 파일 `game/growth.js` 하나(순수 함수 + 두 틱 함수), 받은편지함은 새 파일 `game/inbox.js`. 기존 파일은 연결부만 바꾼다(`league-season.js` 훅·기본값, `season-runner.js` 멈춤, `model.js` 저장 v4, `player-ratings.js` export 하나). 화면은 `app.js`에 메시지 탭·팝업·▲▼를 최소 수정으로 붙인다. 모든 난수는 `선수id:연도:월:용도` 문자열 해시라 재실행해도 결과가 같다.
 
@@ -10,16 +10,16 @@
 
 **Spec:** [`docs/superpowers/specs/2026-09-29-growth-decay-design.md`](../specs/2026-09-29-growth-decay-design.md)
 
-## 선행 조건: 계약 PR 1 머지 후 착수 (2026-09-29 결정)
+## 선행 조건: 계약 PR 1 머지 후 착수 (2026-09-29 결정, 반영 완료)
 
-계약 시스템 PR 1([계획](2026-09-29-contract-base.md))이 먼저 머지된다. 머지 확인 뒤 `git fetch github && git rebase github/main`을 하고, 실행 전에 이 계획을 아래대로 고친다. 고치기 전의 태스크 본문은 계약 PR 1 이전 코드(`startNextSeason` 한 덩어리, 410명, 저장 v3) 기준이다.
+계약 PR 1(PR #6, `ece95a4`)이 머지된 뒤 이 계획을 그 코드에 맞췄다. 맞춘 내용:
 
-- [ ] 저장 버전: 계약 PR 1이 v4(`PREV_KEYS=[v3, v2]`, `upgradeToV4`)를 쓴다. Task 2를 v5로 바꾼다: `STATE_KEY='dugout-prototype-v5'`, `PREV_KEYS=['dugout-prototype-v4', ...계약 쪽 목록]`, 이전 버전은 계약 쪽 이관(`upgradeToV4`)을 거친 뒤 `ensureSeason`이 `dev`·`inbox`를 채우는 순서가 되게 `loadState`를 맞춘다. 테스트의 키 이름도 같이.
-- [ ] 오프시즌 흐름: `startNextSeason`이 `closeSeason`/`ageLeague`/`prepareNextSeason`으로 나뉘고 `offseasonTick`은 `ageLeague`에서 불린다. `offseasonGrowth`의 전제(나이 +1·`history[연도]` 보관 뒤, `state.season.year`는 끝난 시즌)가 그대로인지 계약 코드에서 확인한다. Task 6의 history 테스트는 `startNextSeason` 대신 `closeSeason`+`ageLeague`로 부를지 확인한다.
-- [ ] 팝업 위치: [다음 시즌으로]가 [오프시즌 시작]과 단계 진행([다음 단계])으로 바뀐다. Task 7 치환 K를 없애고, 노화 단계로 넘어가는 클릭 처리(`nextStep`이 `ageLeague`를 부르는 곳) 뒤에 `showPopup()`을 넣는다. 오프시즌 화면이 모달을 쓰는지 확인하고 팝업이 덮이지 않게 한다.
-- [ ] 선수 수 410 → 550(가상 선수 `generated`, 외국인 `foreign`). 성장 테스트는 인원을 고정하지 않지만, Task 8 스모크의 "상위 276명" 기준과 기준 출력은 다시 돌려 갱신한다.
-- [ ] `app.js` 주 메뉴: 계약 PR 1이 "오프시즌" 메뉴를 추가한다. Task 7 치환 E의 old 문자열을 머지된 코드에서 다시 뽑는다. 다른 치환(A~O)도 old 문자열이 그대로인지 `split(old).length-1===1`로 모두 확인한다.
-- [ ] 계약 쪽 "오프시즌 뉴스"와 받은편지함의 역할 구분을 PR 설명에 적는다(통합은 후속).
+- 저장: 계약 PR 1의 v4 위에 v5(Task 2). 이전 키는 모두 `upgradeToV4`를 거치고 `ensureSeason`이 성장 필드와 `version:5`를 채운다.
+- 오프시즌 흐름: `startNextSeason`이 `closeSeason`→`ageLeague`→`prepareNextSeason`으로 나뉘었고 `offseasonTick`은 `ageLeague`에서 불린다. `offseasonGrowth`의 전제(나이 +1·`history[연도]` 보관 뒤, `state.season.year`는 끝난 시즌)는 그대로다. 실제 단계 흐름(`beginOffseason`/`nextStep`) 테스트를 Task 6에 넣었다.
+- 팝업: [다음 단계] 처리 뒤(Task 7 치환 K).
+- 선수 550명(가상 선수 `generated`, 외국인 `foreign`). 외국인은 성장·각성 없음(Task 4). 스모크 기준 출력은 550명으로 다시 뽑았다(Task 8).
+- `app.js` 치환 문자열 A~O는 머지된 코드에서 모두 한 번씩 맞는지 확인했다.
+- 계약 쪽 "오프시즌 뉴스"(단계 로그)와 받은편지함의 역할 구분은 PR 설명에 적는다(통합은 후속).
 
 ## Global Constraints
 
@@ -27,7 +27,7 @@
 - `app.js`, `model.js`는 한 줄 압축 파일이다. 필요한 부분만 정확한 문자열 치환으로 고치고 포맷을 바꾸지 않는다.
 - `vendor/`, `game/ratings.js`, `game/engine.js` 등 엔진 이식 원본은 수정하지 않는다.
 - 능력치는 20–80 정수, OVR·POT는 `game/player-ratings.js`의 `ovr()`·`potCap()`으로만 계산한다.
-- 저장 키: `dugout-prototype-v4`. v3·v2 저장을 이어받는다.
+- 저장 키: `dugout-prototype-v5`. v4·v3·v2 저장을 이어받는다(계약 PR 1의 `upgradeToV4`를 거친 뒤 `ensureSeason`).
 - 보낸 사람 이름은 `스카우트 팀장`.
 - 테스트 명령: `node --test tests/<파일>.test.mjs`, 전체는 `npm test`. PR 전 전체 통과 필수.
 - 브랜치 `feat/growth-decay`(이미 생성됨, 설계 문서 커밋 `1026cb7` 포함).
@@ -41,7 +41,7 @@
 | `game/player-ratings.js` | `weightsFor` export |
 | `game/league-season.js` | 훅 연결, `ensureSeason`에 `dev`·`inbox` 기본값 |
 | `game/season-runner.js` | 중요 메시지가 오면 그날 뒤 멈춤 |
-| `model.js` | `STATE_KEY` v4, `PREV_KEYS` |
+| `model.js` | `STATE_KEY` v5, `PREV_KEYS`에 v4 추가, `initialState` `version:5` |
 | `app.js`, `styles.css` | 메시지 탭·배지·화면, 팝업, 홈 메시지 상자, ▲▼ |
 | `tests/inbox.test.mjs`, `tests/growth.test.mjs` (신규) | 단위·통합 테스트 |
 | `tests/league-season.test.mjs`, `tests/season-runner.test.mjs` | 마이그레이션·history·멈춤 보강 |
@@ -155,75 +155,84 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 2: 저장 v4와 기본값
+### Task 2: 저장 v5와 기본값
+
+계약 PR 1이 저장 v4(`PREV_KEYS=[v3, v2]`, `upgradeToV4`)를 만들었다. 성장은 선수 `dev`·상태 `inbox`를 더하므로 v5로 올린다. `upgradeToV4`는 이미 55명인 로스터에 다시 불러도 선수를 더하지 않으므로(`prepareRoster`가 부족분만 채움) v4 저장도 같은 경로로 읽고, 빠진 필드는 `ensureSeason`이 채운다.
 
 **Files:**
-- Modify: `model.js` (`STATE_KEY` 선언, `loadState`)
+- Modify: `model.js` (`STATE_KEY` 선언, `initialState`의 `version`)
 - Modify: `game/league-season.js` (`ensureSeason`)
 - Modify: `game/player-ratings.js` (`weightsFor` export)
 - Create: `game/growth.js` (이 태스크에서는 `ensureDev`만)
-- Test: `tests/league-season.test.mjs` (기존 v2 테스트 수정 + v3 테스트 추가)
+- Test: `tests/league-season.test.mjs` (기존 이관 테스트 교체)
 
 **Interfaces:**
 - Produces:
-  - `model.js`: `STATE_KEY = 'dugout-prototype-v4'`, `PREV_KEYS = ['dugout-prototype-v3','dugout-prototype-v2']` (`PREV_KEY`는 없어짐)
+  - `model.js`: `STATE_KEY = 'dugout-prototype-v5'`, `PREV_KEYS = ['dugout-prototype-v4','dugout-prototype-v3','dugout-prototype-v2']`, `initialState().version === 5`
   - `game/growth.js`: `blankDev() → {fit:{sum:0,n:0,bsum:0}, mark:{pa:0,outs:0}, pending:0, eventYear:null}`, `ensureDev(p) → p.dev`
-  - `ensureSeason(state)`가 모든 선수에 `p.dev`, 상태에 `state.inbox = []`를 채운다
+  - `ensureSeason(state)`가 모든 선수에 `p.dev`, 상태에 `state.inbox = []`를 채우고 `state.version`을 5로 올린다
   - `game/player-ratings.js`: `export function weightsFor(p)`
 
-- [ ] **Step 1: 테스트 수정·추가**
+- [ ] **Step 1: 테스트 교체·추가**
 
-`tests/league-season.test.mjs` 맨 아래의 기존 블록
+`tests/league-season.test.mjs`의 기존 이관 테스트
 
 ```js
-import {loadState,STATE_KEY,PREV_KEY} from '../model.js';
-
-test('v2 저장(개막 전)을 편성 그대로 v3 시즌 상태로 옮긴다',()=>{
-  const mem=new Map(),storage={getItem:k=>mem.get(k)??null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)};
-  const v2=initialState();v2.order=[...v2.order].reverse();
-  mem.set(PREV_KEY,JSON.stringify(v2));
-  const {state}=loadState(storage);
-  ensureSeason(state);
-  assert.equal(STATE_KEY,'dugout-prototype-v3');
-  assert.deepEqual(state.order,v2.order);
-  assert.equal(state.season.date,'2026-03-28');
-  assert.ok(state.players.every(p=>p.energy===100&&p.stats));
-  assert.equal(mem.has(PREV_KEY),false);
+test('v2·v3 저장은 편성 그대로 v4로 옮기고 이전 키를 지운다',()=>{
+  assert.equal(STATE_KEY,'dugout-prototype-v4');
+  for(const key of PREV_KEYS){
+    const mem=new Map(),storage={getItem:k=>mem.get(k)??null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)};
+    const old=initialState();
+    for(const i of Object.keys(old.league))old.league[i]=old.league[i].filter(p=>!p.generated&&!p.foreign);
+    old.players=old.players.filter(p=>!p.generated&&!p.foreign);
+    for(const p of [...old.players,...Object.values(old.league).flat()])delete p.contract;
+    delete old.finance;delete old.offseason;delete old.version;
+    old.order=[...old.order].reverse();
+    mem.set(key,JSON.stringify(old));
+    const {state}=loadState(storage);
+    ensureSeason(state);
+    assert.equal(state.version,4,key);
+    assert.deepEqual(state.order,old.order,key);
+    assert.equal(state.players.length,55,key);
+    assert.ok(state.finance,key);
+    assert.equal(state.season.date,'2026-03-28',key);
+    assert.ok(state.players.every(p=>p.energy===100&&p.stats),key);
+    assert.equal(mem.has(key),false,key);
+  }
 });
 ```
 
 를 다음으로 바꾼다:
 
 ```js
-import {loadState,STATE_KEY,PREV_KEYS} from '../model.js';
-
-const memStorage=()=>{const mem=new Map();return {mem,storage:{getItem:k=>mem.get(k)??null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)}};};
-
-test('v2 저장(개막 전)을 편성 그대로 시즌 상태로 옮긴다',()=>{
-  const {mem,storage}=memStorage();
-  const v2=initialState();v2.order=[...v2.order].reverse();
-  mem.set(PREV_KEYS[1],JSON.stringify(v2));
-  const {state}=loadState(storage);
-  ensureSeason(state);
-  assert.equal(STATE_KEY,'dugout-prototype-v4');
-  assert.deepEqual(state.order,v2.order);
-  assert.equal(state.season.date,'2026-03-28');
-  assert.ok(state.players.every(p=>p.energy===100&&p.stats));
-  assert.equal(mem.has(PREV_KEYS[1]),false);
-});
-
-test('v3 저장(시즌 진행 중)을 진행 상태 그대로 v4로 옮기고 성장 기본값을 채운다',()=>{
-  const {mem,storage}=memStorage();
-  const v3=fresh();v3.season.date='2026-05-02';v3.order=[...v3.order].reverse();
-  for(const p of allPlayers(v3))delete p.dev;delete v3.inbox;
-  mem.set(PREV_KEYS[0],JSON.stringify(v3));
-  const {state}=loadState(storage);
-  ensureSeason(state);
-  assert.equal(state.season.date,'2026-05-02');
-  assert.deepEqual(state.order,v3.order);
-  assert.deepEqual(state.inbox,[]);
-  assert.ok(allPlayers(state).every(p=>p.dev&&p.dev.fit.n===0&&p.dev.pending===0&&p.dev.eventYear===null));
-  assert.equal(mem.has(PREV_KEYS[0]),false);
+test('v2·v3·v4 저장은 편성 그대로 v5로 옮기고 성장 기본값을 채운 뒤 이전 키를 지운다',()=>{
+  assert.equal(STATE_KEY,'dugout-prototype-v5');
+  assert.deepEqual(PREV_KEYS,['dugout-prototype-v4','dugout-prototype-v3','dugout-prototype-v2']);
+  for(const key of PREV_KEYS){
+    const mem=new Map(),storage={getItem:k=>mem.get(k)??null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)};
+    const old=initialState();
+    if(key==='dugout-prototype-v4')old.version=4; // v4: 계약 필드는 있고 dev·inbox 가 없다(initialState 에는 원래 없음)
+    else{
+      for(const i of Object.keys(old.league))old.league[i]=old.league[i].filter(p=>!p.generated&&!p.foreign);
+      old.players=old.players.filter(p=>!p.generated&&!p.foreign);
+      for(const p of [...old.players,...Object.values(old.league).flat()])delete p.contract;
+      delete old.finance;delete old.offseason;delete old.version;
+    }
+    old.order=[...old.order].reverse();
+    mem.set(key,JSON.stringify(old));
+    const {state}=loadState(storage);
+    ensureSeason(state);
+    assert.equal(state.version,5,key);
+    assert.deepEqual(state.order,old.order,key);
+    assert.equal(state.players.length,55,key);
+    assert.ok(Object.values(state.league).every(t=>t.length===55),key);
+    assert.ok(state.finance,key);
+    assert.equal(state.season.date,'2026-03-28',key);
+    assert.ok(state.players.every(p=>p.energy===100&&p.stats),key);
+    assert.deepEqual(state.inbox,[],key);
+    assert.ok(allPlayers(state).every(p=>p.dev&&p.dev.fit.n===0&&p.dev.pending===0&&p.dev.eventYear===null),key);
+    assert.equal(mem.has(key),false,key);
+  }
 });
 ```
 
@@ -243,7 +252,7 @@ test('v3 저장(시즌 진행 중)을 진행 상태 그대로 v4로 옮기고 �
 - [ ] **Step 2: 실패 확인**
 
 Run: `node --test tests/league-season.test.mjs`
-Expected: FAIL — `PREV_KEYS` import가 undefined라 `PREV_KEYS[1]`에서 TypeError, `p.dev` 없음
+Expected: FAIL — `STATE_KEY`가 v4, `p.dev` 없음
 
 - [ ] **Step 3: 구현**
 
@@ -275,30 +284,30 @@ export const ensureDev=p=>p.dev??=blankDev();
 `model.js`에서
 
 ```js
-export const STATE_KEY='dugout-prototype-v3',PREV_KEY='dugout-prototype-v2',LEGACY_KEYS=['dugout-prototype-v1','dugout-active-game-v1'];
-```
-
-를
-
-```js
 export const STATE_KEY='dugout-prototype-v4',PREV_KEYS=['dugout-prototype-v3','dugout-prototype-v2'],LEGACY_KEYS=['dugout-prototype-v1','dugout-active-game-v1'];
 ```
 
-로, `loadState` 안의
+를
 
 ```js
-try{const prev=JSON.parse(storage.getItem(PREV_KEY));storage.removeItem(PREV_KEY);if(prev?.league)return {state:prev,reset:false};}catch{}
+export const STATE_KEY='dugout-prototype-v5',PREV_KEYS=['dugout-prototype-v4','dugout-prototype-v3','dugout-prototype-v2'],LEGACY_KEYS=['dugout-prototype-v1','dugout-active-game-v1'];
+```
+
+로, `initialState` 안의
+
+```js
+return {version:4,players,
 ```
 
 를
 
 ```js
-for(const key of PREV_KEYS){try{const prev=JSON.parse(storage.getItem(key));storage.removeItem(key);if(prev?.league)return {state:prev,reset:false};}catch{}}
+return {version:5,players,
 ```
 
-로 바꾼다. (이전 버전 상태는 그대로 돌려주고, 빠진 필드는 `ensureSeason`이 채운다.)
+로 바꾼다. `loadState`는 그대로 둔다(이전 키는 `upgradeToV4`를 거쳐 돌려주고, v5 필드는 `ensureSeason`이 채운다).
 
-`game/league-season.js`에서 import 줄 끝(`import {teams,teamPlayers,positions} from '../model.js';` 다음)에 추가:
+`game/league-season.js`에서 `import {teams,teamPlayers,positions} from '../model.js';` 다음 줄에 추가:
 
 ```js
 import {ensureDev} from './growth.js';
@@ -311,20 +320,21 @@ export function ensureSeason(state){
   state.season??=createSeason(2026);
   state.inbox??=[];
   for(const p of allPlayers(state)){p.energy??=100;p.stats??=blankStats();p.history??={};p.lastPlayed??=null;p.streak??=0;ensureDev(p);}
+  if((state.version??0)<5)state.version=5; // v4 이전 저장은 upgradeToV4 가 4로 맞춘 뒤 여기서 성장 필드를 채운다
   return state;
 }
 ```
 
 - [ ] **Step 4: 통과 확인**
 
-Run: `node --test tests/league-season.test.mjs tests/league-data.test.mjs tests/model.test.mjs`
-Expected: PASS 전부
+Run: `node --test tests/league-season.test.mjs tests/league-data.test.mjs tests/model.test.mjs tests/contract-fill.test.mjs tests/contract-finance.test.mjs tests/contract-offseason.test.mjs`
+Expected: PASS 전부 (`contract-fill`의 `upgradeToV4` 단독 테스트는 여전히 4를 기대하고, `ensureSeason`을 거치지 않으므로 그대로 통과)
 
 - [ ] **Step 5: 커밋**
 
 ```bash
 git add model.js game/league-season.js game/player-ratings.js game/growth.js tests/league-season.test.mjs
-git commit -m "저장 v4: 선수 dev·받은편지함 필드를 추가하고 v3·v2 저장을 이어받는다
+git commit -m "저장 v5: 선수 dev·받은편지함 필드를 추가하고 v4·v3·v2 저장을 이어받는다
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -836,7 +846,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces:
   - `SCOUT = '스카우트 팀장'`
   - `monthlyGrowth(state) → {events: [{p, mine, type, before}]}` — `state.season.date`가 새 달 1일인 시점에 호출(2단계 `finishDay`). 내 팀 변화가 있으면 일반 메시지 `${월-1}월 스카우트 리포트`, 내 팀 이벤트는 중요 메시지, 다른 팀 이벤트는 `season.news` 한 줄.
-  - `offseasonGrowth(state) → {events}` — `startNextSeason` 안에서 나이 +1 뒤, `state.season.year`는 아직 끝난 시즌. 전원 `history[year].ovr/pot` 기록(변화 전), 내 팀 이벤트 중요 메시지, 중요 메시지 `${year} 오프시즌 스카우트 리포트`. 오프시즌 이벤트는 소식에 넣지 않는다(새 시즌 생성 때 지워지므로).
+  - `offseasonGrowth(state) → {events}` — `ageLeague`(오프시즌 ② → ③, 또는 `startNextSeason`) 안에서 나이 +1 뒤, `state.season.year`는 아직 끝난 시즌. 전원 `history[year].ovr/pot` 기록(변화 전), 내 팀 이벤트 중요 메시지, 중요 메시지 `${year} 오프시즌 스카우트 리포트`. 오프시즌 이벤트는 소식에 넣지 않는다(새 시즌 생성 때 지워지므로).
 
 - [ ] **Step 1: 실패하는 테스트 추가**
 
@@ -1004,6 +1014,24 @@ test('다음 시즌으로: 실제 성장 훅이 돌아 history 에 OVR·POT, 오
   for(const p of allPlayers(s))assert.deepEqual({ovr:p.history[2026].ovr,pot:p.history[2026].pot},before.get(p.id));
   assert.ok(s.inbox.some(m=>m.subject==='2026 오프시즌 스카우트 리포트'));
 });
+
+test('오프시즌 단계: ② 은퇴·방출을 떠날 때(노화) 성장이 돌고 리포트가 온다',()=>{
+  const s=fresh();s.season.phase='ended';
+  assert.ok(beginOffseason(s));
+  assert.equal(s.inbox.length,0);
+  nextStep(s); // ① → ②
+  assert.equal(s.inbox.length,0);
+  nextStep(s); // ② → ③: ageLeague → offseasonTick
+  assert.equal(s.offseason.step,'salary');
+  assert.ok(s.inbox.some(m=>m.subject==='2026 오프시즌 스카우트 리포트'&&m.importance==='high'));
+  assert.ok(allPlayers(s).every(p=>p.history[2026].ovr!=null));
+});
+```
+
+`tests/league-season.test.mjs` import 영역에 추가:
+
+```js
+import {beginOffseason,nextStep} from '../game/contract/offseason.js';
 ```
 
 `tests/season-runner.test.mjs` import에 추가:
@@ -1094,7 +1122,7 @@ import {pendingPopup} from './inbox.js';
 
 - [ ] **Step 4: 통과 확인**
 
-Run: `node --test tests/league-season.test.mjs tests/season-runner.test.mjs tests/growth.test.mjs tests/inbox.test.mjs`
+Run: `node --test tests/league-season.test.mjs tests/season-runner.test.mjs tests/growth.test.mjs tests/inbox.test.mjs tests/contract-offseason.test.mjs`
 Expected: PASS 전부
 
 - [ ] **Step 5: 전체 테스트**
@@ -1156,49 +1184,49 @@ const KEY=STATE_KEY;let inboxSel=null,inboxFrom='all';
 치환 C — old:
 
 ```js
-schedule:'스케줄',team:'상대팀 1군 로스터'};
+team:'상대팀 1군 로스터',offseason:'오프시즌'};
 ```
 
 new:
 
 ```js
-schedule:'스케줄',team:'상대팀 1군 로스터',inbox:'메시지'};
+team:'상대팀 1군 로스터',offseason:'오프시즌',inbox:'메시지'};
 ```
 
 치환 D — old:
 
 ```js
-team:'OPPOSITION REPORT'};
+team:'OPPOSITION REPORT',offseason:'OFFSEASON'};
 ```
 
 new:
 
 ```js
-team:'OPPOSITION REPORT',inbox:'NEWS & MAIL'};
+team:'OPPOSITION REPORT',offseason:'OFFSEASON',inbox:'NEWS & MAIL'};
 ```
 
-치환 E — old:
+치환 E — old (메시지 탭은 계약 PR 1의 오프시즌 탭 앞, 늘 보이는 자리에 둔다):
 
 ```js
-${['home','lineup','roster','records','schedule'].map(v=>`<button class="${view===v?'active':''}" data-nav="${v}" ${view===v?'aria-current="page"':''}>${titles[v]}</button>`).join('')}
+${['home','lineup','roster','records','schedule',...(state.offseason?['offseason']:[])].map(v=>`<button class="${view===v?'active':''}" data-nav="${v}" ${view===v?'aria-current="page"':''}>${titles[v]}</button>`).join('')}
 ```
 
 new:
 
 ```js
-${['home','lineup','roster','records','schedule','inbox'].map(v=>`<button class="${view===v?'active':''}" data-nav="${v}" ${view===v?'aria-current="page"':''}>${titles[v]}${v==='inbox'&&unreadCount(state)?` <span class="badge" aria-label="안 읽은 메시지 ${unreadCount(state)}개">${unreadCount(state)}</span>`:''}</button>`).join('')}
+${['home','lineup','roster','records','schedule','inbox',...(state.offseason?['offseason']:[])].map(v=>`<button class="${view===v?'active':''}" data-nav="${v}" ${view===v?'aria-current="page"':''}>${titles[v]}${v==='inbox'&&unreadCount(state)?` <span class="badge" aria-label="안 읽은 메시지 ${unreadCount(state)}개">${unreadCount(state)}</span>`:''}</button>`).join('')}
 ```
 
 치환 F — old:
 
 ```js
-({home,lineup,roster,records,schedule:calendar,team:teamView})[view]()
+team:teamView,offseason:()=>
 ```
 
 new:
 
 ```js
-({home,lineup,roster,records,schedule:calendar,team:teamView,inbox})[view]()
+team:teamView,inbox,offseason:()=>
 ```
 
 - [ ] **Step 3: 메시지 화면·팝업 함수 추가**
@@ -1263,16 +1291,16 @@ else{if(modal.open)modal.close();toast(`${fmtDate(state.season.date)}까지 진�
 치환 K — old:
 
 ```js
-nextseason'){startNextSeason(state);save();modal.close();render();toast(`${state.season.year} 시즌 개막 전으로 넘어왔습니다.`);}
+save();offTab=null;if(!state.offseason){view='home';toast(`${state.season.year} 시즌 개막 전으로 넘어왔습니다.`);}render();}
 ```
 
 new:
 
 ```js
-nextseason'){startNextSeason(state);save();modal.close();render();toast(`${state.season.year} 시즌 개막 전으로 넘어왔습니다.`);showPopup();}
+save();offTab=null;if(!state.offseason){view='home';toast(`${state.season.year} 시즌 개막 전으로 넘어왔습니다.`);}render();showPopup();}
 ```
 
-(`runAdvance`의 `finally{...render();}`는 모달을 닫지 않으므로 팝업이 유지된다. [다음 날]의 내 경기 뒤에도 `finishMyGame` → `runAdvance('day')`를 거치므로 같은 경로로 팝업이 뜬다.)
+(계약 PR 1의 [다음 단계](`data-action="nextstep"`) 처리 끝이다. ② 은퇴·방출을 떠날 때 `nextStep`이 `ageLeague`를 부르고, 그 안의 `offseasonTick`이 오프시즌 리포트를 보낸다. 오프시즌 화면은 모달이 아니라 페이지라 팝업이 그 위에 뜬다. `runAdvance`의 `finally{...render();}`는 모달을 닫지 않으므로 팝업이 유지된다. [다음 날]의 내 경기 뒤에도 `finishMyGame` → `runAdvance('day')`를 거치므로 같은 경로로 팝업이 뜬다.)
 
 - [ ] **Step 6: 홈 메시지 상자와 ▲▼**
 
@@ -1360,7 +1388,7 @@ Expected: 문법 오류 없음, 테스트 전부 통과
 2. 홈에서 [월말]을 두 번 눌러 4/1을 넘긴다 → "3월 스카우트 리포트"가 오고 메뉴에 배지. 내 팀 각성이 났으면 진행이 멈추고 팝업.
 3. 메시지 화면에서 목록 클릭 → 본문 표가 보이고 굵은 글씨가 풀림, 배지 숫자 감소. [모두 읽음], [메시지 삭제] 동작.
 4. `resize_window` mobile(375×812)에서 목록 → 본문 한 칸 전환, [← 목록] 동작. 확인 뒤 preset desktop으로 되돌린다.
-5. 홈의 [시즌 끝](90초 안팎) → 종료 모달 [다음 시즌으로] → "2026 오프시즌 스카우트 리포트" 팝업, 로스터 표 OVR·POT 옆 ▲▼ 확인.
+5. 홈의 [시즌 끝](90초 안팎) → 종료 모달 [오프시즌 시작] → 오프시즌 화면 [다음 단계] 두 번(① → ② → ③) → "2026 오프시즌 스카우트 리포트" 팝업. 로스터 표 OVR·POT 옆 ▲▼는 새 시즌이 시작된 뒤(⑥ [새 시즌 시작])에 보인다(`history[지난 연도]` 기준).
 6. `read_console_messages`에 오류가 없다.
 
 - [ ] **Step 10: 커밋**
@@ -1433,28 +1461,26 @@ for(const n of watch)console.log(`${n}: ${paths[n].join(' → ')}`);
 - [ ] **Step 2: 실행하고 기준과 비교**
 
 Run: `npm run test:growth`
-Expected: 11줄의 연도별 요약과 5명 궤적(1초 이내). 기준(설계 문서 "인터뷰 때 참고한 추정"):
-- 상위 276명 평균 OVR이 2030년 무렵까지 49–52 사이
-- 각성은 첫 몇 해 연 10–15건, 급락은 연 2–10건(은퇴가 없어 고령화로 해마다 늘어남)
-- 김도영은 25세 무렵까지 80, 양의지는 3년 뒤 50–58
+Expected: 11줄의 연도별 요약과 5명 궤적(1초 이내). 계약 PR 1 이후 리그는 550명(실제 410 + 가상 뎁스 110 + 외국인 30)이고, 외국인 30명(평균 OVR 70)이 상위권에 들어가 개막 "상위 276명" 평균이 50.4가 아니라 53.6에서 시작한다.
 
-계획 작성 때 이 계획의 코드로 돌린 기준 출력(비교용):
+계획 작성 때 이 계획의 코드로 돌린 기준 출력(550명, 비교용):
 
 ```text
-2026 개막 | 상위276 50.4 하위10% 42 | ≤22 39.9 23–26 44.5 27–31 46.4 32–35 46.2 36+ 49.1 | 각성 0 급락 0 | POT80 3 | 평균나이 28.0
-2026 종료 후 | 상위276 50.8 하위10% 43 | ≤22 44.0 23–26 47.3 27–31 46.2 32–35 45.5 36+ 44.0 | 각성 10 급락 7 | POT80 4 | 평균나이 29.0
-2028 종료 후 | 상위276 51.6 하위10% 42 | ≤22 54.8 23–26 53.9 27–31 46.9 32–35 43.5 36+ 37.1 | 각성 12 급락 2 | POT80 5 | 평균나이 31.0
-2031 종료 후 | 상위276 50.7 하위10% 38 | ≤22 0.0 23–26 63.0 27–31 51.8 32–35 43.8 36+ 29.8 | 각성 1 급락 11 | POT80 3 | 평균나이 34.0
-2035 종료 후 | 상위276 44.3 하위10% 26 | ≤22 0.0 23–26 0.0 27–31 60.3 32–35 47.4 36+ 27.3 | 각성 0 급락 14 | POT80 2 | 평균나이 38.0
+2026 개막 | 상위276 53.6 하위10% 45 | ≤22 38.0 23–26 42.5 27–31 48.7 32–35 49.6 36+ 49.1 | 각성 0 급락 0 | POT80 3 | 평균나이 27.0
+2026 종료 후 | 상위276 54.2 하위10% 46 | ≤22 42.8 23–26 44.8 27–31 47.2 32–35 50.2 36+ 44.0 | 각성 16 급락 7 | POT80 4 | 평균나이 28.0
+2027 종료 후 | 상위276 55.0 하위10% 46 | ≤22 48.7 23–26 47.8 27–31 45.9 32–35 49.8 36+ 40.1 | 각성 25 급락 7 | POT80 8 | 평균나이 29.0
+2029 종료 후 | 상위276 57.0 하위10% 48 | ≤22 0.0 23–26 55.7 27–31 46.9 32–35 47.5 36+ 35.7 | 각성 20 급락 6 | POT80 5 | 평균나이 31.0
+2031 종료 후 | 상위276 57.0 하위10% 47 | ≤22 0.0 23–26 62.5 27–31 50.3 32–35 44.3 36+ 33.2 | 각성 4 급락 11 | POT80 4 | 평균나이 33.0
+2035 종료 후 | 상위276 52.7 하위10% 40 | ≤22 0.0 23–26 0.0 27–31 60.3 32–35 45.6 36+ 29.0 | 각성 0 급락 15 | POT80 3 | 평균나이 37.0
 김도영: 23세 77/80 → 24세 78/80 → 25세 80/80 → … → 29세 78/78 → 33세 75/75
 최민석: 20세 52/80 → 21세 60/80 → 22세 66/80 → 23세 68/80 → 24세 76/80 → 26세 80/80
 신재인: 19세 31/62 → 21세 45/62 → 23세 53/62 → 24세 57/68 → 27세 64/64
 양의지: 39세 66/66 → 40세 62/62 → 41세 62/62 → 42세 55/55
 ```
 
-2031년 이후 하락과 "≤22 0.0"(해당 나이 선수 없음)은 은퇴·신인이 없어서 생기는 알려진 한계다. 조정 대상이 아니다.
+**튜닝 판단 지점(사용자 확인)**: 410명일 때는 상위 276명 평균이 4년간 ±1.5 안이었지만, 550명에서는 2029년까지 +3.4 오른다(리그 인플레이션). 원인은 가상 뎁스 110명(평균 22.8세, OVR 35.6, POT 51)이 AI "항상 적정" ×1.2로 POT까지 크는 것과, 인원이 늘어 각성이 연 16–25건으로 늘어난 것. AI 계수를 ×1.0으로 내리면 +2.2(2029년 55.8)로 줄어든다. 계약 쪽 은퇴·드래프트가 들어오면 흐름이 또 바뀐다. 실행 전 사용자가 정한 방향대로 `judgeFit`의 AI 계수 또는 `BREAKOUT.young`을 조정하고, 조정했으면 Task 3·4 테스트의 기대값(AI `{grow:1.2,burst:2}`, 각성 확률 `.05*2*.6`)도 같이 고친다.
 
-벗어나면 `game/growth.js` 상단 상수(`curve`, `NOISE_SD`, `BREAKOUT`, `COLLAPSE`)만 조정하고 Step 2를 다시 돌린다. 조정했으면 `node --test tests/growth.test.mjs`도 다시 돌려 곡선 테스트 기대값을 새 숫자와 맞춘다.
+2031년 이후 하락과 "≤22 0.0"(해당 나이 선수 없음)은 은퇴·신인이 없어서 생기는 알려진 한계다. 조정 대상이 아니다.
 
 - [ ] **Step 3: 설계 문서에 구현 시 보정 기록**
 
@@ -1466,7 +1492,8 @@ Expected: 11줄의 연도별 요약과 5명 궤적(1초 이내). 기준(설계 �
 - 난수: `game/ratings.js`의 `spread`는 끝 글자만 다른 키끼리 값이 붙어 나와(최종 섞기 없음) Box–Muller 두 값이 상관된다. `growth.js`에 FNV-1a + murmur3 finalizer 해시 `rand(key)`를 따로 두었다.
 - POT 상한은 26세 이하 성장기에만 적용한다. 27세 이상은 개인차(±)가 그대로 들어가고 오프시즌 끝에 POT = OVR로 맞춘다(상한을 두면 개인차가 음수로만 작동해 하락이 생긴다).
 - POT 재평가의 "27세까지 남은 평균 성장"은 새 나이 다음 해부터 26세까지의 곡선 합(`curve(age+1)…curve(26)`)이다.
-- 기본값 채우기는 `ensureSeason`이 한다(`dev`, `inbox`). 이전 저장 키는 `PREV_KEYS = [v3, v2]`.
+- 저장은 계약 PR 1의 v4 위에 v5. 이전 키 `PREV_KEYS = [v4, v3, v2]`는 모두 `upgradeToV4`를 거치고, 기본값(`dev`, `inbox`, `version:5`)은 `ensureSeason`이 채운다.
+- 외국인(`foreign`)은 성장·각성 없음, POT = OVR(계약 설계). 오프시즌 리포트 팝업은 [다음 단계]로 ②를 떠난 뒤 뜬다.
 - 메시지 id는 받은편지함의 최대 id + 1(별도 카운터 필드 없음).
 - 오프시즌 각성·급락은 리그 소식에 넣지 않는다(새 시즌 생성 때 소식이 비워지므로 오프시즌 리포트 명단에만 둔다).
 - `rollMonth`/`rollOffseason`은 `fit`을 받으면 판정 대신 그 값을 쓴다(테스트에서 계수 1.0·각성 0 고정용).
@@ -1490,7 +1517,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 6: PR 준비 (사용자 확인 후)**
 
 `git fetch github && git rebase github/main` 후 `npm test`. PR 설명에 적을 것(AGENTS.md):
-- 공유 파일 변경: `model.js` 저장 키 v4·`PREV_KEYS`, 선수 `dev`·상태 `inbox` 필드, `app.js` 주 메뉴에 "메시지" 탭 추가
+- 공유 파일 변경: `model.js` 저장 키 v5·`PREV_KEYS`·`version`, `league-season.js` `ensureSeason` 기본값·훅, 선수 `dev`·상태 `inbox` 필드, `app.js` 주 메뉴에 "메시지" 탭 추가
 - 계약 브랜치 안내: 알림은 `game/inbox.js`의 `pushMessage(state, {from, subject, body, importance})`로 보낸다
 - 범위 밖: 은퇴·신인(계약 브랜치), AI 1·2군 이동, 게임성 특성
 ```
