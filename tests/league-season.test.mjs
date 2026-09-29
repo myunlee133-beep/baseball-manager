@@ -78,3 +78,18 @@ test('라인업이 9명이 아니면 문제를 알려준다',()=>{
   const s=fresh();s.order=s.order.slice(0,8);
   assert.match(lineupProblem(s),/타자/);
 });
+
+import {loadState,STATE_KEY,PREV_KEY} from '../model.js';
+
+test('v2 저장(개막 전)을 편성 그대로 v3 시즌 상태로 옮긴다',()=>{
+  const mem=new Map(),storage={getItem:k=>mem.get(k)??null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)};
+  const v2=initialState();v2.order=[...v2.order].reverse();
+  mem.set(PREV_KEY,JSON.stringify(v2));
+  const {state}=loadState(storage);
+  ensureSeason(state);
+  assert.equal(STATE_KEY,'dugout-prototype-v3');
+  assert.deepEqual(state.order,v2.order);
+  assert.equal(state.season.date,'2026-03-28');
+  assert.ok(state.players.every(p=>p.energy===100&&p.stats));
+  assert.equal(mem.has(PREV_KEY),false);
+});
