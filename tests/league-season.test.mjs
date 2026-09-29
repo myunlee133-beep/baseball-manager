@@ -15,7 +15,7 @@ test('새 시즌: 개막 전, 전원 체력 100과 빈 성적',()=>{
   assert.equal(s.season.date,'2026-03-28');
   assert.equal(s.season.schedule.length,720);
   assert.ok(allPlayers(s).every(p=>p.energy===100&&p.stats&&p.history&&p.lastPlayed===null));
-  assert.equal(allPlayers(s).length,410);
+  assert.equal(allPlayers(s).length,550);
   assert.equal(lineupProblem(s),null);
 });
 
@@ -79,17 +79,27 @@ test('라인업이 9명이 아니면 문제를 알려준다',()=>{
   assert.match(lineupProblem(s),/타자/);
 });
 
-import {loadState,STATE_KEY,PREV_KEY} from '../model.js';
+import {loadState,STATE_KEY,PREV_KEYS} from '../model.js';
 
-test('v2 저장(개막 전)을 편성 그대로 v3 시즌 상태로 옮긴다',()=>{
-  const mem=new Map(),storage={getItem:k=>mem.get(k)??null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)};
-  const v2=initialState();v2.order=[...v2.order].reverse();
-  mem.set(PREV_KEY,JSON.stringify(v2));
-  const {state}=loadState(storage);
-  ensureSeason(state);
-  assert.equal(STATE_KEY,'dugout-prototype-v3');
-  assert.deepEqual(state.order,v2.order);
-  assert.equal(state.season.date,'2026-03-28');
-  assert.ok(state.players.every(p=>p.energy===100&&p.stats));
-  assert.equal(mem.has(PREV_KEY),false);
+test('v2·v3 저장은 편성 그대로 v4로 옮기고 이전 키를 지운다',()=>{
+  assert.equal(STATE_KEY,'dugout-prototype-v4');
+  for(const key of PREV_KEYS){
+    const mem=new Map(),storage={getItem:k=>mem.get(k)??null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)};
+    const old=initialState();
+    for(const i of Object.keys(old.league))old.league[i]=old.league[i].filter(p=>!p.generated&&!p.foreign);
+    old.players=old.players.filter(p=>!p.generated&&!p.foreign);
+    for(const p of [...old.players,...Object.values(old.league).flat()])delete p.contract;
+    delete old.finance;delete old.offseason;delete old.version;
+    old.order=[...old.order].reverse();
+    mem.set(key,JSON.stringify(old));
+    const {state}=loadState(storage);
+    ensureSeason(state);
+    assert.equal(state.version,4,key);
+    assert.deepEqual(state.order,old.order,key);
+    assert.equal(state.players.length,55,key);
+    assert.ok(state.finance,key);
+    assert.equal(state.season.date,'2026-03-28',key);
+    assert.ok(state.players.every(p=>p.energy===100&&p.stats),key);
+    assert.equal(mem.has(key),false,key);
+  }
 });
