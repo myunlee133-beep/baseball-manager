@@ -100,15 +100,25 @@ export function seasonLine(stats=blankStats(),pitcher=false){
     k9:per9(m('strikeouts')),bb9:per9(m('walks')),war:null};
 }
 
-export function startNextSeason(state){
+/** ① 시즌 마감: 올해 성적을 history[연도]로 옮긴다. 나이·일정은 그대로. */
+export function closeSeason(state){
   const year=state.season.year;
   for(const p of allPlayers(state)){
     if(Object.keys(p.stats.batting).length||Object.keys(p.stats.pitching).length)p.history[year]=p.stats;
-    p.stats=blankStats();p.age+=1;p.energy=100;p.lastPlayed=null;p.streak=0;
+    p.stats=blankStats();
   }
+}
+/** 노화: 나이 +1, 체력 회복, 3단계 성장·퇴화 훅. 오프시즌 ②와 ③ 사이에서 부른다. */
+export function ageLeague(state){
+  for(const p of allPlayers(state)){p.age+=1;p.energy=100;p.lastPlayed=null;p.streak=0;}
   hooks.offseasonTick(state);
+}
+/** 새 시즌 준비: 지난 박스스코어 삭제, 다음 연도 일정·순위. 오프시즌 ⑥ 뒤에 부른다. */
+export function prepareNextSeason(state){
+  const year=state.season.year;
   dropBoxes(year);
   const autoRestMine=state.season.autoRestMine;
   state.season={...createSeason(year+1),autoRestMine};
   state.strategy.next=state.rotation[0]??'';
 }
+export function startNextSeason(state){closeSeason(state);ageLeague(state);prepareNextSeason(state);}

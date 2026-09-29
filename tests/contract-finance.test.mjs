@@ -88,3 +88,15 @@ test('순위 수입: 1위 20억부터 2억씩, 정산은 순위 순 팀 번호�
   assert.equal(s.finance.teams[0].income,180000);
   assert.equal(s.finance.teams[9].income,20000);
 });
+
+import {initialState,teams as clubNames,teamPlayers} from '../model.js';
+// KBO 공식 2026 구단 평균 연봉(만 원, 신인·외국인 제외). 팀 번호 순: KT 삼성 한화 SSG 키움 NC LG 롯데 두산 KIA
+const REAL_AVG=[19878,18863,17613,20783,10022,13168,20094,17654,20776,15623];
+test('초기 연봉 보정: 팀 국내 총연봉이 실제 구단 평균 × 52명의 ±25% 이내이고 캡 이하',()=>{
+  const s=initialState();
+  clubNames.forEach((name,i)=>{
+    const v=domesticPayroll(teamPlayers(s,i)),target=REAL_AVG[i]*52;
+    assert.ok(v>=target*.75&&v<=target*1.25,`${name} ${money(v)} (목표 ${money(target)})`);
+    assert.ok(v<=FIN.cap,`${name} 캡 초과 ${money(v)}`);
+  });
+});
