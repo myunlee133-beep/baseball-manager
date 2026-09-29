@@ -10,6 +10,17 @@
 
 **Spec:** [`docs/superpowers/specs/2026-09-29-growth-decay-design.md`](../specs/2026-09-29-growth-decay-design.md)
 
+## 선행 조건: 계약 PR 1 머지 후 착수 (2026-09-29 결정)
+
+계약 시스템 PR 1([계획](2026-09-29-contract-base.md))이 먼저 머지된다. 머지 확인 뒤 `git fetch github && git rebase github/main`을 하고, 실행 전에 이 계획을 아래대로 고친다. 고치기 전의 태스크 본문은 계약 PR 1 이전 코드(`startNextSeason` 한 덩어리, 410명, 저장 v3) 기준이다.
+
+- [ ] 저장 버전: 계약 PR 1이 v4(`PREV_KEYS=[v3, v2]`, `upgradeToV4`)를 쓴다. Task 2를 v5로 바꾼다: `STATE_KEY='dugout-prototype-v5'`, `PREV_KEYS=['dugout-prototype-v4', ...계약 쪽 목록]`, 이전 버전은 계약 쪽 이관(`upgradeToV4`)을 거친 뒤 `ensureSeason`이 `dev`·`inbox`를 채우는 순서가 되게 `loadState`를 맞춘다. 테스트의 키 이름도 같이.
+- [ ] 오프시즌 흐름: `startNextSeason`이 `closeSeason`/`ageLeague`/`prepareNextSeason`으로 나뉘고 `offseasonTick`은 `ageLeague`에서 불린다. `offseasonGrowth`의 전제(나이 +1·`history[연도]` 보관 뒤, `state.season.year`는 끝난 시즌)가 그대로인지 계약 코드에서 확인한다. Task 6의 history 테스트는 `startNextSeason` 대신 `closeSeason`+`ageLeague`로 부를지 확인한다.
+- [ ] 팝업 위치: [다음 시즌으로]가 [오프시즌 시작]과 단계 진행([다음 단계])으로 바뀐다. Task 7 치환 K를 없애고, 노화 단계로 넘어가는 클릭 처리(`nextStep`이 `ageLeague`를 부르는 곳) 뒤에 `showPopup()`을 넣는다. 오프시즌 화면이 모달을 쓰는지 확인하고 팝업이 덮이지 않게 한다.
+- [ ] 선수 수 410 → 550(가상 선수 `generated`, 외국인 `foreign`). 성장 테스트는 인원을 고정하지 않지만, Task 8 스모크의 "상위 276명" 기준과 기준 출력은 다시 돌려 갱신한다.
+- [ ] `app.js` 주 메뉴: 계약 PR 1이 "오프시즌" 메뉴를 추가한다. Task 7 치환 E의 old 문자열을 머지된 코드에서 다시 뽑는다. 다른 치환(A~O)도 old 문자열이 그대로인지 `split(old).length-1===1`로 모두 확인한다.
+- [ ] 계약 쪽 "오프시즌 뉴스"와 받은편지함의 역할 구분을 PR 설명에 적는다(통합은 후속).
+
 ## Global Constraints
 
 - 사용자에게 보이는 문구와 커밋 메시지·주석은 한국어. 커밋 메시지는 무엇을 왜 바꿨는지 한 줄(AGENTS.md), 끝에 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
@@ -693,6 +704,18 @@ test('시즌 중 급락: 즉시 약 −3, pending −2',()=>{
   assert.equal(p.dev.pending,-2);
 });
 
+test('외국인: 성장·각성 없음, POT = OVR, 하락은 국내와 같다',()=>{
+  for(let i=0;i<300;i++){
+    const f=hitter(`fx${i}`,24,50);f.foreign=true;f.pot=f.ovr;const o=f.ovr;
+    for(let m=4;m<=9;m++)rollMonth(f,{year:2026,month:m,mine:false,top:none});
+    const r=rollOffseason(f,{year:2026,mine:false,top:none});
+    assert.equal(r.event,null);assert.ok(f.ovr<=o,`${o} → ${f.ovr}`);assert.equal(f.pot,f.ovr);
+  }
+  const d=[];
+  for(let i=0;i<1000;i++){const f=hitter(`fo${i}`,36,55);f.foreign=true;const o=score(f);rollOffseason(f,{year:2026,mine:false,top:none,fit:flat});d.push(score(f)-o);}
+  assert.ok(Math.abs(avg(d)-(-3*.7-.05*.6*5))<.3,`평균 ${avg(d)}`);
+});
+
 test('27–29세 각성: 오프시즌 뒤 POT가 OVR을 따라간다, 평균 +4 가산',()=>{
   const gain=[];
   for(let i=0;gain.length<40;i++){const p=hitter(`pr${i}`,28,50);p.pot=p.ovr;const o=score(p),r=rollOffseason(p,{year:2026,mine:false,top:none});if(r.event){assert.equal(r.event.type,'breakout');assert.equal(p.pot,p.ovr);gain.push(score(p)-o);}}
@@ -728,7 +751,7 @@ export const EVENT_OFFSEASON=.6; // 연간 확률 중 오프시즌 몫. 나머�
 function rollEvent(p,{year,key,share,fit,t,inSeason}){
   const dev=p.dev,age=p.age;
   if(dev.eventYear===year)return null;
-  const chance=age<=26?BREAKOUT.young*(fit?.burst??1)*bloomFactor(t.bloom,age):age<=29?BREAKOUT.prime*bloomFactor(t.bloom,age):0;
+  const chance=p.foreign?0:age<=26?BREAKOUT.young*(fit?.burst??1)*bloomFactor(t.bloom,age):age<=29?BREAKOUT.prime*bloomFactor(t.bloom,age):0;
   if(chance&&rand(key+':breakout')<chance*share){
     dev.eventYear=year;
     let extra;
@@ -747,7 +770,8 @@ function rollEvent(p,{year,key,share,fit,t,inSeason}){
   return null;
 }
 const merge=(a,b)=>{for(const [k,v] of Object.entries(b)){a[k]=(a[k]||0)+v;if(!a[k])delete a[k];}return a;};
-const baseChange=(age,fit,t)=>{const c=curve(age);return c>0?c*(fit?.grow??1)*t.effort:c*t.aging;};
+// 외국인(계약 시스템의 foreign)은 성장·각성 없이 하락·급락만 국내와 같다.
+const baseChange=(p,fit,t)=>{const c=curve(p.age);if(c>0)return p.foreign?0:c*(fit?.grow??1)*t.effort;return c*t.aging;};
 
 /** 월간 틱(현재 나이). 그달 출전량으로 적정 리그를 판정·누적하고, 연간 변화의 5%와 시즌 중 각성·급락을 반영한다. */
 export function rollMonth(p,{year,month,mine,top,fit}){
@@ -760,7 +784,7 @@ export function rollMonth(p,{year,month,mine,top,fit}){
   }
   dev.mark=cur;
   const event=rollEvent(p,{year,key,share:(1-EVENT_OFFSEASON)/MONTH_TICKS,fit,t,inSeason:true});
-  const changed=grow(p,baseChange(p.age,fit,t)*MONTH_SHARE,key+':m',p.age<=26);
+  const changed=grow(p,baseChange(p,fit,t)*MONTH_SHARE,key+':m',p.age<=26);
   if(event)merge(changed,grow(p,event.now,key+':e',p.age<=26));
   p.pot=potCap(p.pot,p.ovr);
   return {changed,before,event};
@@ -775,9 +799,9 @@ export function rollOffseason(p,{year,mine,top,fit}){
   }
   const pending=dev.pending;dev.pending=0;
   const event=rollEvent(p,{year,key,share:EVENT_OFFSEASON,fit,t,inSeason:false});
-  const dOvr=baseChange(age,fit,t)*OFFSEASON_SHARE+NOISE_SD*normal(key+':noise')+pending+(event?.now||0);
+  const dOvr=baseChange(p,fit,t)*OFFSEASON_SHARE+NOISE_SD*normal(key+':noise')+pending+(event?.now||0);
   const changed=grow(p,dOvr,key,age<=26);
-  if(age>=27)p.pot=p.ovr;
+  if(age>=27||p.foreign)p.pot=p.ovr;
   else if(age>=24){let rest=0;for(let a=age+1;a<=26;a++)rest+=curve(a);p.pot=Math.round(p.pot+(p.ovr+rest-p.pot)*.25);}
   p.pot=potCap(p.pot,p.ovr);
   dev.fit={sum:0,n:0,bsum:0};dev.mark={pa:0,outs:0};
@@ -788,7 +812,7 @@ export function rollOffseason(p,{year,mine,top,fit}){
 - [ ] **Step 4: 통과 확인**
 
 Run: `node --test tests/growth.test.mjs`
-Expected: PASS (17 tests). 오프시즌 평균 테스트가 특정 나이에서만 벗어나면 `baseChange`의 곡선·특성 곱과 `grow`의 capped 조건(26세 이하만)을 확인한다.
+Expected: PASS (18 tests). 오프시즌 평균 테스트가 특정 나이에서만 벗어나면 `baseChange`의 곡선·특성 곱과 `grow`의 capped 조건(26세 이하만)을 확인한다.
 
 - [ ] **Step 5: 커밋**
 
@@ -944,7 +968,7 @@ export function offseasonGrowth(state){
 - [ ] **Step 4: 통과 확인**
 
 Run: `node --test tests/growth.test.mjs`
-Expected: PASS (20 tests)
+Expected: PASS (21 tests)
 
 - [ ] **Step 5: 커밋**
 
