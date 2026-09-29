@@ -61,15 +61,40 @@ test('①~⑥ 진행: 수입 정산, 노화는 ②→③에서 한 번, 끝나�
   }finally{hooks.offseasonTick=orig;}
 });
 
-test('55명을 넘는 구단이 있으면 새 시즌으로 넘어가지 않는다',()=>{
+test('내 팀이 55명을 넘으면 새 시즌으로 넘어가지 않는다',()=>{
   const s=ended();
   beginOffseason(s);
   while(s.offseason.step!=='roster')nextStep(s);
-  s.league[3].push({...structuredClone(s.league[3].at(-1)),id:'3-extra'});
-  assert.deepEqual(rosterProblems(s).over,[{team:3,count:56}]);
+  for(let i=0;i<6;i++)s.players.push({...structuredClone(s.players.at(-1)),id:`0-extra-${i}`});
+  const n=s.players.length;
+  assert.deepEqual(rosterProblems(s).over,[{team:0,count:n}]);
   assert.equal(nextStep(s),false);
   assert.equal(s.offseason.step,'roster');
   assert.equal(s.season.year,2026);
+});
+
+test('AI 구단이 55명을 넘으면 ⑥을 떠날 때 자동 방출되고, 시장에 남은 선수는 은퇴한다',()=>{
+  const s=ended();
+  beginOffseason(s);
+  while(s.offseason.step!=='roster')nextStep(s);
+  for(let i=0;i<6;i++)s.league[3].push({...structuredClone(s.league[3].at(-1)),id:`3-extra-${i}`,ovr:99});
+  assert.equal(nextStep(s),true);
+  assert.equal(s.league[3].length,55);
+  assert.equal(s.offseason,null);
+  assert.equal(s.season.year,2027);
+});
+
+test('②에 들어올 때 은퇴가 판정되고, 떠날 때 시장 선수도 나이를 먹는다',()=>{
+  const s=ended();
+  beginOffseason(s);
+  assert.deepEqual(s.offseason.freeAgents,[]);
+  nextStep(s);
+  assert.equal(s.offseason.step,'retire');
+  assert.ok(s.offseason.retired.length>0);
+  s.offseason.freeAgents.push({...structuredClone(s.players.at(-1)),id:'fa-1',fromTeam:0,contract:null});
+  const age=s.offseason.freeAgents[0].age;
+  nextStep(s);
+  assert.equal(s.offseason.freeAgents[0].age,age+1);
 });
 
 test('내 팀 편성 경고: 빈 수비 위치, 선발 5명 미만',()=>{
