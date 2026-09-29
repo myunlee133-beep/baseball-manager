@@ -41,3 +41,28 @@ test('투구 단위 엔진으로 DUGOUT 경기를 끝까지 완주한다',()=>{
  assert.ok(game.pitchNumber>100);
  assert.equal(game.score.home,game.lineScore.home.reduce((a,b)=>a+(Number(b)||0),0));
 });
+
+import {createLeagueGame} from '../game-bridge.js';
+
+const withSeason=s=>({...s,season:{rotationTurn:{1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0},autoRestMine:true}});
+
+test('시즌 경기: 내 팀이 원정이어도 편성·선발이 들어가고 경기가 끝난다',()=>{
+  const state=withSeason(initialState());
+  const {plans,engine}=createLeagueGame(state,{id:'2026-001',home:3,away:0});
+  assert.equal(engine.teams.away.name,'KT 위즈');
+  assert.equal(plans.away.team,0);
+  assert.equal(plans.away.starterId,state.strategy.next);
+  assert.deepEqual(Object.keys(plans.away.starters).sort(),[...state.order].sort());
+  assert.equal(advanceDugoutGame(engine,'game').status,'final');
+});
+
+test('시즌 경기: 체력이 낮으면 엔진 능력치가 깎이고, 같은 경기 id 는 같은 결과',()=>{
+  const state=withSeason(initialState()),id=state.order[0];
+  state.players.find(p=>p.id===id).energy=30;
+  const {engine}=createLeagueGame(state,{id:'2026-002',home:0,away:4});
+  const p=state.players.find(x=>x.id===id),e=engine.teams.home.lineup.find(x=>x.player.id===id).player;
+  assert.equal(e.contact,Math.max(5,Math.round(p.ratings.contact-12)));
+  const a=advanceDugoutGame(createLeagueGame(state,{id:'2026-009',home:1,away:2}).engine,'game');
+  const b=advanceDugoutGame(createLeagueGame(state,{id:'2026-009',home:1,away:2}).engine,'game');
+  assert.deepEqual(a.score,b.score);
+});
