@@ -1,4 +1,5 @@
 import {T as GAPS} from './gaps.mjs';
+import {ovr as ovrOf,weightedRating,OVR_BASE as FIXED_BASE} from '../../game/player-ratings.js';
 // 투수: 보직|한글|영문|나이|투(L/R/'')|G|IP|BB|SO|WHIP   (기록 없으면 G부터 비움)
 // 타자: 포지션|한글|영문|나이|타(L/R/S/'')|G|PA|AVG|HR|BB|SO|OPS
 const TEAMS=[
@@ -326,20 +327,21 @@ for(const p of players){
   }
 }
 // ── OVR: 가중 평균 → 2026 개막 1군 기준 평균 50·표준편차 8로 확대 (기준값은 고정 상수로 저장) ──
-const W={B:{c:.3,e:.2,p:.3,s:.1,d:.1},Bp:{c:.27,e:.18,p:.25,s:.1,d:.2},DH:{c:.35,e:.25,p:.4},SP:{v:.2,st:.35,ct:.3,sm:.15},RP:{v:.25,st:.45,ct:.3}};
-const wm=p=>{const w=p.kind==='B'?(p.pos==='DH'?W.DH:['C','SS','CF'].includes(p.pos)?W.Bp:W.B):(p.isRP?W.RP:W.SP);return Object.entries(w).reduce((s,[k,x])=>s+x*p.r[k],0)-(p.kind==='P'&&p.isRP?3:0);};
-const one=players.filter(p=>p.grp==='1군').map(wm);export const OVR_BASE={mean:mean(one),sd:sd(one)};
+const LONGK={c:'contact',e:'eye',p:'power',s:'speed',d:'defense',v:'velocity',st:'stuff',ct:'control',sm:'stamina'};
+for(const p of players)p.ratings=Object.fromEntries(Object.entries(p.r).map(([k,v])=>[LONGK[k],v])),p.pitcher=p.kind==='P';
+const one=players.filter(p=>p.grp==='1군').map(weightedRating);export const OVR_BASE={mean:mean(one),sd:sd(one)};
+if(OVR_BASE.mean!==FIXED_BASE.mean||OVR_BASE.sd!==FIXED_BASE.sd)console.error('경고: game/player-ratings.js OVR_BASE와 데이터 분포가 다르다',OVR_BASE);
 const POT2={'한화:문동주':3,'한화:정우주':3,'한화:김서현':3};
 for(const p of players){
   const k=`${p.code}:${p.ko}`;
-  p.ovr=Math.max(20,Math.min(80,Math.round(50+8*(wm(p)-OVR_BASE.mean)/OVR_BASE.sd)));
+  p.ovr=ovrOf(p);
   const room=p.age<=20?25:({21:22,22:18,23:14,24:11,25:7,26:4})[p.age]??0;
   const dev=Math.round(hash(k)*14-7);
   if(POT2[k]!=null){p.pot=Math.min(80,p.ovr+POT2[k]);p.potSrc='지정(OVR+3)';}
   else if(POT[k]!=null){p.pot=Math.max(p.ovr,POT[k]);p.potSrc=POT[k]<p.ovr?`지정 ${POT[k]}→OVR로 올림`:'지정';}
   else p.pot=Math.max(p.ovr,Math.min(80,p.ovr+(room?room+dev:0)));
 }
-export {players};
+export {players,TEAMS};
 if(import.meta.url===`file://${process.argv[1]}`){
   const fmt=p=>p.kind==='B'?`${p.r.c}/${p.r.e}/${p.r.p}/${p.r.s}/${p.r.d}`:`${p.r.v}/${p.r.st}/${p.r.ct}/${p.r.sm}`;
   const posOf=p=>p.kind==='B'?p.pos+(p.posSrc||''):(p.role==='2군'?'P':p.role);

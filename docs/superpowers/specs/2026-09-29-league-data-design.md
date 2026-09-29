@@ -28,7 +28,7 @@
 - 검토·승인된 결과:
   - [`2026-09-29-kbo-2026-roster.md`](2026-09-29-kbo-2026-roster.md): 410명 전체 명단 (1군 276, 2군 134)
   - [`2026-09-29-kbo-2026-roster-estimates.md`](2026-09-29-kbo-2026-roster-estimates.md): 빈 곳 추정 근거 (개별 추정 35명, 기본값 규칙, 원문 보정)
-- 생성기: `scripts/kbo-2026/roster.mjs` (+ `gaps.mjs`). 위 명단 문서와 같은 결과를 낸다. 구현 시 여기서 `game/kbo-2026.js`를 생성한다.
+- 생성기: `scripts/kbo-2026/roster.mjs`(+ `gaps.mjs`, 원문 부가 기록 `extra.mjs`)가 명단 문서와 같은 결과를 내고, `emit.mjs`(`npm run data:kbo`)가 `game/kbo-2026.js`를 쓴다.
 - 원문의 `FA in 'YY`를 `faYear`로 추가 파싱해 저장한다(현재 생성기에는 없음).
 
 ### 선수 필드
@@ -40,7 +40,7 @@
   pot, faYear|null, lastSeason: {원문 성적}|null, ...올해 누적 성적(0 시작) }
 ```
 
-`ovr`는 저장하지 않고 계산한다.
+`ovr`·`pot`는 선수 객체에 캐시로 저장하고, 계산은 `game/player-ratings.js`의 `ovr()` 한 곳에서만 한다(능력치가 바뀌면 다시 계산). 기록 필드(`avg`, `era` 등)에는 2025 원문 성적을 풀어 넣는다.
 
 ### 변환 규칙 (승인됨)
 
@@ -65,10 +65,10 @@
 | 파일 | 변경 |
 |---|---|
 | `game/kbo-2026.js` | **신규**. 생성기 출력(410명 고정 데이터) |
-| `game/player-ratings.js` | **신규**. 가중치·μ·σ 상수, `ovr(player)`, `clampPot(player)` |
-| `model.js` | 최소 수정: `teams`를 실제 구단명으로, `seedPlayers` 대신 `kbo-2026` 로드, `initialState`가 10개 구단 전원과 원문 보직 기반 라인업·로테이션·불펜 역할을 만든다(선발이 5명 미만인 팀은 체력 높은 불펜으로 채움). 기본 팀은 KT |
-| `game-bridge.js` | `toEngineHitter/Pitcher`가 `ratings`를 그대로 사용. 좌우 null이면 기존 해시. 성적 역산(및 BABIP 우선순위 버그 줄) 제거. 상대 팀도 `state.players`에서 읽음 |
-| `app.js` | 최소 수정: `seedPlayers(i)` 호출부를 상태 조회로, 날짜 표시 "2026 시즌 개막 전", 기록실은 `lastSeason`을 "2025" 라벨로, OVR은 계산값 표시 |
+| `game/player-ratings.js` | **신규**. 가중치·μ·σ 상수, `ovr(player)`, `potCap(pot,ovr)`, `isReliever`(체력 45 미만) |
+| `model.js` | 최소 수정: `teams`를 실제 구단명으로, `kbo-2026` 로드, `initialState`가 내 팀은 `state.players`, 다른 9개 팀은 `state.league[팀번호]`에 두고 `teamSetup()`으로 원문 보직 기반 라인업·로테이션·불펜 역할을 만든다(선발이 5명 미만인 팀은 체력 높은 불펜으로 채움). 기본 팀은 KT |
+| `game-bridge.js` | `toEngineHitter/Pitcher`가 `ratings`를 그대로 사용. 좌우 null이면 기존 해시. 성적 역산(및 BABIP 우선순위 버그 줄) 제거. 상대 팀은 `teamPlayers(state,i)`·`teamSetup()`으로 구성. 스위치히터는 엔진이 좌/우만 받아 좌타로 넣음 |
+| `app.js` | 최소 수정: `seedPlayers(i)` 호출부를 `teamPlayers(state,i)`로, 저장 로드는 `model.js`의 `loadState()`, 날짜 표시 "2026 시즌 개막 전", 기록실은 `lastSeason`을 "2025" 라벨로, OVR은 계산값 표시 |
 | `README.md` | 가상 데이터 안내 수정, 실명 사용·라이선스 주의 한 줄 |
 
 `model.js`·`app.js`는 공유 파일이므로 PR 설명에 상태 구조 변경을 명시한다(AGENTS.md).
@@ -97,3 +97,10 @@
 - 좌우 미상 125명(대부분 2군)은 해시 배정.
 - 외국인 선수가 없어 실제보다 로테이션이 약하다.
 - 개별 추정 값은 2025년까지의 실제 커리어에 대한 추정이며 확신도가 낮은 선수가 있다(estimates 문서 표기).
+
+## 구현 시 보정 (2026-09-29)
+
+- `state.players`는 내 팀만 두고 다른 구단은 `state.league`에 둔다. `app.js`와 `movePlayer` 등이 `state.players`를 내 팀으로 전제하고 있어, 한 배열에 합치면 공유 파일 수정이 커진다.
+- `seedPlayers`는 앱에서 쓰지 않지만 `tests/engine.test.mjs`(구 `engine.js` 보정 테스트) 픽스처라 남긴다.
+- 투수 포지션 표기는 원문 보직(SP)을 따르고, OVR 가중치의 선발/불펜 구분은 체력 45 기준을 쓴다(배찬승처럼 선발 보직이지만 불펜으로 뛴 선수).
+- 개막 전이라 홈 순위표는 0승 0패, 스케줄은 결과 없는 임시 일정이다. 홈 뉴스 등 시즌 중 문구는 2단계에서 교체한다.

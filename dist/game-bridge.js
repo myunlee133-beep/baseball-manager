@@ -1,40 +1,28 @@
 import { createGame, aiPitch, simulateHalfInning, simulateGame, getCurrentBatter, getCurrentPitcher } from './game/engine.js';
-import { seedPlayers, teams, positions } from './model.js';
+import { teams, positions, teamPlayers, teamSetup } from './model.js';
 
 export const ENGINE_SAVE_KEY='dugout-active-game-v1';
 const clamp=(v,min=20,max=80)=>Math.max(min,Math.min(max,Math.round(v)));
-const rate=(value,average,spread)=>clamp(50+(value-average)*spread);
 const handed=id=>id.split('').reduce((n,c)=>n+c.charCodeAt(0),0)%3===0?'좌':'우';
+// 엔진은 좌/우만 받는다. 스위치히터는 좌타로 넣고, 모르는 선수는 id 해시로 고정 배정한다.
+const hand=(h,id)=>h==='R'?'우':h==='L'||h==='S'?'좌':handed(id);
 
-/**
- * DUGOUT 화면 능력치를 프로야구 10의 20–80 엔진 능력치로 바꾼다.
- * 종합(OVR)은 작은 보정만 주고, 실제 성적 성향이 각 능력의 중심을 결정한다.
- */
+/** 저장된 20–80 능력치를 그대로 프로야구 10 엔진 입력으로 넘긴다. 히든 스탯은 엔진이 id 로 만든다. */
 export function toEngineHitter(player){
-  const pa=Math.max(1,player.pa),ab=Math.max(1,player.ab),bip=Math.max(1,player.ab-player.k-player.hr+player.sacFlies||0);
-  const avg=player.h/ab,kRate=player.k/pa,bbRate=player.bb/pa,hrRate=player.hr/pa;
-  const ovr=(player.ovr-70)*.18;
+  const r=player.ratings;
   return {
-    id:player.id,name:player.name,position:player.pos,bats:handed(player.id),
-    contact:clamp((rate(avg,.260,115)+rate(kRate,.20,-80))/2+ovr),
-    eye:clamp(rate(bbRate,.09,145)+ovr),
-    power:clamp(rate(hrRate,.028,360)+ovr),
-    speed:clamp(43+Math.min(20,player.sb*1.2)+ovr),
-    defense:clamp(46+(player.ovr-70)*.45+(['C','SS','CF'].includes(player.pos)?4:0)),
+    id:player.id,name:player.name,position:player.pos,bats:hand(player.bats,player.id),
+    contact:r.contact,eye:r.eye,power:r.power,speed:r.speed,defense:r.defense,
     fatigue:clamp(100-player.energy,0,100),
-    hidden:{babip:clamp(rate((player.h-player.hr)/bip,.310,90)+ovr)},
   };
 }
 
 export function toEnginePitcher(player){
-  const ovr=(player.ovr-70)*.18;
+  const r=player.ratings;
   return {
-    id:player.id,name:player.name,throws:handed(player.id),role:player.pos==='SP'?'선발':'중계',
-    velocity:clamp(48+(player.ovr-70)*.35+(Number(player.id.split('-').at(-1))%7-3)),
-    stuff:clamp(rate(player.k9,8.0,3.2)+ovr),
-    control:clamp(rate(player.bb9,3.2,-5.2)+ovr),
-    stamina:clamp(player.pos==='SP'?48+(player.ovr-60)*.55:30+(player.ovr-60)*.22),
-    hold:clamp(48+(player.ovr-70)*.25),pitchCount:0,fatigue:clamp(100-player.energy,0,100),
+    id:player.id,name:player.name,throws:hand(player.throws,player.id),role:player.pos==='SP'?'선발':'중계',
+    velocity:r.velocity,stuff:r.stuff,control:r.control,stamina:r.stamina,
+    hold:clamp(48+(r.control-50)*.25),pitchCount:0,fatigue:clamp(100-player.energy,0,100),
   };
 }
 
@@ -57,12 +45,9 @@ function makeTeam(name,index,players,order,field,starterId,roles={}){
 }
 
 export function createDugoutGame(state,opponentIndex,seed=20330614){
-  const opponent=seedPlayers(opponentIndex);
-  const order=opponent.filter(p=>!p.pitcher&&p.group==='first').slice(0,9).map(p=>p.id);
-  const field=Object.fromEntries(positions.map((pos,i)=>[pos,order[i]]));
-  const theirStarter=opponent.find(p=>p.pitcher&&p.group==='first'&&p.pos==='SP')?.id;
+  const opponent=teamPlayers(state,opponentIndex),their=teamSetup(opponent);
   const home=makeTeam(teams[0],0,state.players,state.order,state.field,state.strategy.next||state.rotation[0],state.roles);
-  const away=makeTeam(teams[opponentIndex],opponentIndex,opponent,order,field,theirStarter);
+  const away=makeTeam(teams[opponentIndex],opponentIndex,opponent,their.order,their.field,their.rotation[0],their.roles);
   return createGame(home,away,seed);
 }
 
