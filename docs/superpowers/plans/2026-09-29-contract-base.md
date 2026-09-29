@@ -426,15 +426,16 @@ test('가상 선수는 부족한 쪽부터: 투수·야수 모두 26명 또는 �
   });
 });
 
-test('외국인 등급: 1선발 63~68, 2선발 58~63, 타자 59~65, 최댓값 ≤ 국내 5위 OVR',()=>{
-  const fifth=[...PLAYERS].map(p=>p.ovr).sort((a,b)=>b-a)[4];
+test('외국인: 능력치 범위 준수(제구는 구속 보정으로 범위 아래로 내려갈 수 있음), 등급 1선발 74~78·2선발 68~73·타자 62~68',()=>{
+  const within=(p,shape)=>Object.entries(shape).every(([k,[lo,hi]])=>k==='control'?p.ratings[k]<=hi:p.ratings[k]>=lo&&p.ratings[k]<=hi);
   for(const r of filled){
     const [ace,sp2]=r.filter(p=>p.foreign&&p.pitcher).sort((a,b)=>b.ovr-a.ovr),bat=r.find(p=>p.foreign&&!p.pitcher);
-    assert.ok(ace.ovr>=63&&ace.ovr<=68,`ace ${ace.ovr}`);
-    assert.ok(sp2.ovr>=58&&sp2.ovr<=63,`sp2 ${sp2.ovr}`);
-    assert.ok(bat.ovr>=59&&bat.ovr<=65,`bat ${bat.ovr}`);
+    assert.ok(ace.ovr>=74&&ace.ovr<=78,`ace ${ace.ovr}`);
+    assert.ok(sp2.ovr>=68&&sp2.ovr<=73,`sp2 ${sp2.ovr}`);
+    assert.ok(bat.ovr>=62&&bat.ovr<=68,`bat ${bat.ovr}`);
+    assert.ok(within(ace,FILL.foreignShape.pitcher)&&within(sp2,FILL.foreignShape.pitcher),'투수 범위');
+    assert.ok(within(bat,FILL.foreignShape.hitter),'타자 범위');
     for(const p of [ace,sp2,bat]){
-      assert.ok(p.ovr<=fifth);
       assert.equal(p.pot,p.ovr);
       assert.ok(p.age>=26&&p.age<=33);
       assert.equal(p.contract.kind,'foreign');
@@ -504,12 +505,12 @@ export const FILL={
     hitter:{contact:[25,45],eye:[25,45],power:[25,45],speed:[30,55],defense:[30,55]},
     pitcher:{velocity:[35,55],stuff:[30,50],control:[30,50],stamina:[30,60]},
   },
-  // 외국인: OVR 스케일(OVR_BASE 평균 47.1, 표준편차 4.45 → OVR 8)에 맞춘 능력치 범위
+  // 외국인: 인터뷰에서 정한 능력치 범위 그대로. 이 범위의 OVR 분포(투수 평균 약 73, 타자 약 63)에 맞춰 등급을 둔다
   foreignShape:{
-    pitcher:{velocity:[52,68],stuff:[50,64],control:[42,60],stamina:[50,66]},
-    hitter:{contact:[45,60],eye:[42,58],power:[55,72],speed:[30,50],defense:[35,50]},
+    pitcher:{velocity:[60,75],stuff:[55,70],control:[40,62],stamina:[55,70]},
+    hitter:{contact:[45,62],eye:[40,60],power:[60,75],speed:[30,50],defense:[35,50]},
   },
-  foreignSlots:[{slot:'ace',pitcher:true,ovr:[63,68],usd:130},{slot:'sp2',pitcher:true,ovr:[58,63],usd:100},{slot:'bat',pitcher:false,ovr:[59,65],usd:110}],
+  foreignSlots:[{slot:'ace',pitcher:true,ovr:[74,78],usd:130},{slot:'sp2',pitcher:true,ovr:[68,73],usd:100},{slot:'bat',pitcher:false,ovr:[62,68],usd:110}],
   foreignAge:[26,33],usdSpread:.15,
   foreignPos:['1B','LF','RF','DH','1B','LF','RF','DH','3B','CF'], // 1B/LF/RF/DH 80%
 };
@@ -604,7 +605,7 @@ export function upgradeToV4(state){
 
 Run: `node --test tests/contract-fill.test.mjs`
 Expected: PASS (8 tests).
-- `능력치 생성 실패`가 나면 해당 모양(`depthShape`/`foreignShape`)의 범위를 목표 OVR 쪽으로 2씩 옮긴다.
+- `능력치 생성 실패`가 나면 가상 선수는 `depthShape` 범위를 목표 OVR 쪽으로 2씩 옮긴다. **외국인 `foreignShape`는 사용자 결정이라 바꾸지 않는다.** 대신 실패한 등급의 OVR 범위와 실제 분포를 사용자에게 보고한다.
 - "1군 인원 그대로" 실패: `makeRoom`이 외국인 수만큼 내리는지 확인.
 - "외국인 타자가 라인업에" 실패: 외국인이 `roster.unshift`로 앞에 들어가는지, `role`이 `'주전'`인지 확인.
 
