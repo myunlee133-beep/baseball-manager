@@ -15,6 +15,8 @@ test('새 시즌: 개막 전, 전원 체력 100과 빈 성적',()=>{
   assert.equal(s.season.date,'2026-03-28');
   assert.equal(s.season.schedule.length,720);
   assert.ok(allPlayers(s).every(p=>p.energy===100&&p.stats&&p.history&&p.lastPlayed===null));
+  assert.ok(allPlayers(s).every(p=>p.dev&&p.dev.mark.pa===0));
+  assert.deepEqual(s.inbox,[]);
   assert.equal(allPlayers(s).length,550);
   assert.equal(lineupProblem(s),null);
 });
@@ -81,25 +83,32 @@ test('라인업이 9명이 아니면 문제를 알려준다',()=>{
 
 import {loadState,STATE_KEY,PREV_KEYS} from '../model.js';
 
-test('v2·v3 저장은 편성 그대로 v4로 옮기고 이전 키를 지운다',()=>{
-  assert.equal(STATE_KEY,'dugout-prototype-v4');
+test('v2·v3·v4 저장은 편성 그대로 v5로 옮기고 성장 기본값을 채운 뒤 이전 키를 지운다',()=>{
+  assert.equal(STATE_KEY,'dugout-prototype-v5');
+  assert.deepEqual(PREV_KEYS,['dugout-prototype-v4','dugout-prototype-v3','dugout-prototype-v2']);
   for(const key of PREV_KEYS){
     const mem=new Map(),storage={getItem:k=>mem.get(k)??null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)};
     const old=initialState();
-    for(const i of Object.keys(old.league))old.league[i]=old.league[i].filter(p=>!p.generated&&!p.foreign);
-    old.players=old.players.filter(p=>!p.generated&&!p.foreign);
-    for(const p of [...old.players,...Object.values(old.league).flat()])delete p.contract;
-    delete old.finance;delete old.offseason;delete old.version;
+    if(key==='dugout-prototype-v4')old.version=4; // v4: 계약 필드는 있고 dev·inbox 가 없다(initialState 에는 원래 없음)
+    else{
+      for(const i of Object.keys(old.league))old.league[i]=old.league[i].filter(p=>!p.generated&&!p.foreign);
+      old.players=old.players.filter(p=>!p.generated&&!p.foreign);
+      for(const p of [...old.players,...Object.values(old.league).flat()])delete p.contract;
+      delete old.finance;delete old.offseason;delete old.version;
+    }
     old.order=[...old.order].reverse();
     mem.set(key,JSON.stringify(old));
     const {state}=loadState(storage);
     ensureSeason(state);
-    assert.equal(state.version,4,key);
+    assert.equal(state.version,5,key);
     assert.deepEqual(state.order,old.order,key);
     assert.equal(state.players.length,55,key);
+    assert.ok(Object.values(state.league).every(t=>t.length===55),key);
     assert.ok(state.finance,key);
     assert.equal(state.season.date,'2026-03-28',key);
     assert.ok(state.players.every(p=>p.energy===100&&p.stats),key);
+    assert.deepEqual(state.inbox,[],key);
+    assert.ok(allPlayers(state).every(p=>p.dev&&p.dev.fit.n===0&&p.dev.pending===0&&p.dev.eventYear===null),key);
     assert.equal(mem.has(key),false,key);
   }
 });

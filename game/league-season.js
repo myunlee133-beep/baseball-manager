@@ -5,6 +5,7 @@ import {buildSchedule,openingDay,addDays} from './league-schedule.js';
 import {spendEnergy,recoverDay} from './season-fatigue.js';
 import {createLeagueGame} from '../game-bridge.js';
 import {teams,teamPlayers,positions} from '../model.js';
+import {ensureDev} from './growth.js';
 
 /** 3단계 연결점. 2단계에서는 비어 있다. */
 export const hooks={monthlyTick(state){},offseasonTick(state){}};
@@ -18,7 +19,9 @@ export function createSeason(year){
 export const allPlayers=state=>teams.flatMap((_,i)=>teamPlayers(state,i));
 export function ensureSeason(state){
   state.season??=createSeason(2026);
-  for(const p of allPlayers(state)){p.energy??=100;p.stats??=blankStats();p.history??={};p.lastPlayed??=null;p.streak??=0;}
+  state.inbox??=[];
+  for(const p of allPlayers(state)){p.energy??=100;p.stats??=blankStats();p.history??={};p.lastPlayed??=null;p.streak??=0;ensureDev(p);}
+  if((state.version??0)<5)state.version=5; // v4 이전 저장은 upgradeToV4 가 4로 맞춘 뒤 여기서 성장 필드를 채운다
   return state;
 }
 export const todayGames=state=>state.season.schedule.filter(g=>g.date===state.season.date);

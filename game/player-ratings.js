@@ -16,7 +16,7 @@ export const OVR_SPREAD=8;
 
 // 체력 45 미만은 불펜형. 선발 보직이어도 경기당 이닝이 짧으면 불펜 가중치로 본다.
 export const isReliever=p=>p.pitcher&&p.ratings.stamina<45;
-function weightsFor(p){
+export function weightsFor(p){
   if(p.pitcher)return isReliever(p)?OVR_WEIGHTS.reliever:OVR_WEIGHTS.starter;
   if(p.pos==='DH')return OVR_WEIGHTS.dh;
   return ['C','SS','CF'].includes(p.pos)?OVR_WEIGHTS.premium:OVR_WEIGHTS.hitter;
