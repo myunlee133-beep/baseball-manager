@@ -4,6 +4,7 @@ import {initialState} from '../model.js';
 import {ensureSeason,hooks,closeSeason,ageLeague,prepareNextSeason} from '../game/league-season.js';
 import {STEPS,beginOffseason,nextStep,rosterProblems} from '../game/contract/offseason.js';
 import {offseasonMarkup} from '../offseason-ui.js';
+import {releasePlayer} from '../game/contract/release.js';
 
 const ended=()=>{const s=ensureSeason(initialState());s.season.phase='ended';return s;};
 
@@ -117,4 +118,21 @@ test('오프시즌 화면: 현재 단계 CTA, 앞 단계 잠금, 끝난 단계 �
   assert.doesNotMatch(html,/generated/);
   while(s.offseason.step!=='roster')nextStep(s);
   assert.match(offseasonMarkup(s,{tab:null,panel,standingsTable:()=>''}),/새 시즌 시작/);
+});
+
+test('② 화면: 은퇴 목록과 내 팀 방출 버튼, ⑥ 화면: 자유계약 시장 영입 버튼',()=>{
+  const s=ended();
+  beginOffseason(s);nextStep(s);
+  const panel=(t,b)=>`<section><h2>${t}</h2>${b}</section>`,opts={tab:null,panel,standingsTable:()=>''};
+  const two=offseasonMarkup(s,opts);
+  assert.match(two,/은퇴 선수/);
+  assert.match(two,new RegExp(s.offseason.retired[0].name));
+  assert.match(two,new RegExp(`data-release="${s.players.at(-1).id}"`));
+  const id=s.players.at(-1).id;
+  releasePlayer(s,id);
+  while(s.offseason.step!=='roster')nextStep(s);
+  const six=offseasonMarkup(s,opts);
+  assert.match(six,/자유계약 시장/);
+  assert.match(six,new RegExp(`data-sign="${id}"`));
+  assert.match(six,/data-release=/);
 });
