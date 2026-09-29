@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {initialState} from '../model.js';
 import {ensureSeason,hooks,closeSeason,ageLeague,prepareNextSeason} from '../game/league-season.js';
 import {STEPS,beginOffseason,nextStep,rosterProblems} from '../game/contract/offseason.js';
+import {offseasonMarkup} from '../offseason-ui.js';
 
 const ended=()=>{const s=ensureSeason(initialState());s.season.phase='ended';return s;};
 
@@ -75,4 +76,20 @@ test('내 팀 편성 경고: 빈 수비 위치, 선발 5명 미만',()=>{
   const s=ended();
   s.field.C=null;s.rotation=s.rotation.slice(0,3);
   assert.deepEqual(rosterProblems(s).warnings,['비어 있는 수비 위치: C','선발 로테이션 3명']);
+});
+
+test('오프시즌 화면: 현재 단계 CTA, 앞 단계 잠금, 끝난 단계 ✓, 재정 요약',()=>{
+  const s=ended();
+  beginOffseason(s);nextStep(s);
+  const panel=(t,b)=>`<section><h2>${t}</h2>${b}</section>`;
+  const html=offseasonMarkup(s,{tab:null,panel,standingsTable:()=>'<table></table>'});
+  assert.match(html,/data-action="nextstep"/);
+  assert.match(html,/다음 단계/);
+  assert.match(html,/1\. 시즌 마감 ✓/);
+  assert.match(html,/data-offtab="fa"[^>]*disabled/);
+  assert.match(html,/2026 오프시즌 · 2\. 은퇴·방출/);
+  assert.match(html,/샐러리캡/);
+  assert.doesNotMatch(html,/generated/);
+  while(s.offseason.step!=='roster')nextStep(s);
+  assert.match(offseasonMarkup(s,{tab:null,panel,standingsTable:()=>''}),/새 시즌 시작/);
 });
