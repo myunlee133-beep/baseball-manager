@@ -1,11 +1,14 @@
 // game/growth.js
 /** 3단계 성장·퇴화. 월간·오프시즌 틱에서 저장 능력치(20–80)를 나이 곡선대로 움직이고 OVR·POT를 다시 계산한다. 상태는 제자리 변경한다.
  *  규칙과 숫자는 docs/superpowers/specs/2026-09-29-growth-decay-design.md. 튜닝은 scripts/growth-smoke.mjs 결과로 한다. */
-import {ovr,isReliever,weightsFor,OVR_BASE,OVR_SPREAD} from './player-ratings.js';
+import {ovr,potCap,isReliever,weightsFor,OVR_BASE,OVR_SPREAD} from './player-ratings.js';
 
 export const OFFSEASON_SHARE=.7,MONTH_SHARE=.05,MONTH_TICKS=6,NOISE_SD=2;
 export const FIRST_MIN_OVR=42,SECOND_MAX_OVR=48;
 export const MONTH_PLAY={pa:50,spOuts:39,rpOuts:21};
+export const BREAKOUT={young:.05,prime:.02,potMin:8,potMax:15,primeMin:3,primeMax:5};
+export const COLLAPSE={age:34,chance:.05,ovr:-5,now:-3};
+export const EVENT_OFFSEASON=.6;
 // 성장기·하락기 능력치별 배율. OVR 가중치로 정규화하므로 OVR 변화량은 곡선 그대로다.
 export const MULT={
   grow:{contact:1,eye:.8,power:1.2,speed:.8,defense:1,velocity:1.2,stuff:1,control:1,stamina:1},
@@ -100,4 +103,65 @@ export function grow(p,dOvr,key,capped){
     p.ovr=ovr(p);
   }
   return changed;
+}
+
+/** 각성·급락 판정. 일어나면 eventYear·POT·pending 을 고치고 {type, now}(지금 더할 OVR)를 돌려준다. */
+function rollEvent(p,{year,key,share,fit,t,inSeason}){
+  const dev=p.dev,age=p.age;
+  if(dev.eventYear===year)return null;
+  const chance=p.foreign?0:age<=26?BREAKOUT.young*(fit?.burst??1)*bloomFactor(t.bloom,age):age<=29?BREAKOUT.prime*bloomFactor(t.bloom,age):0;
+  if(chance&&rand(key+':breakout')<chance*share){
+    dev.eventYear=year;
+    let extra;
+    if(age<=26){p.pot=Math.min(80,p.pot+between(key+':potup',BREAKOUT.potMin,BREAKOUT.potMax));extra=curve(age)*(fit?.grow??1)*t.effort;}
+    else extra=between(key+':primeup',BREAKOUT.primeMin,BREAKOUT.primeMax);
+    const now=inSeason?extra/2:extra;
+    dev.pending+=extra-now;
+    return {type:'breakout',now};
+  }
+  if(age>=COLLAPSE.age&&rand(key+':collapse')<COLLAPSE.chance*share){
+    dev.eventYear=year;
+    const now=inSeason?COLLAPSE.now:COLLAPSE.ovr;
+    dev.pending+=COLLAPSE.ovr-now;
+    return {type:'collapse',now};
+  }
+  return null;
+}
+const merge=(a,b)=>{for(const [k,v] of Object.entries(b)){a[k]=(a[k]||0)+v;if(!a[k])delete a[k];}return a;};
+// 외국인(계약 시스템의 foreign)은 성장·각성 없이 하락·급락만 국내와 같다.
+const baseChange=(p,fit,t)=>{const c=curve(p.age);if(c>0)return p.foreign?0:c*(fit?.grow??1)*t.effort;return c*t.aging;};
+
+/** 월간 틱(현재 나이). 그달 출전량으로 적정 리그를 판정·누적하고, 연간 변화의 5%와 시즌 중 각성·급락을 반영한다. */
+export function rollMonth(p,{year,month,mine,top,fit}){
+  const dev=ensureDev(p),t=traits(p.id),key=`${p.id}:${year}:${month}`,before={ovr:p.ovr,pot:p.pot};
+  const cur={pa:n(p.stats?.batting,'pa'),outs:n(p.stats?.pitching,'outs')};
+  if(!fit){
+    fit=judgeFit(p,{mine,played:playedEnough(p,{pa:cur.pa-dev.mark.pa,outs:cur.outs-dev.mark.outs})});
+    if(fit?.tag==='firstOk'&&top.has(p.id))fit={...fit,burst:3};
+    if(mine&&fit&&p.age<=26){dev.fit.sum+=fit.grow;dev.fit.n++;dev.fit.bsum+=fit.burst;}
+  }
+  dev.mark=cur;
+  const event=rollEvent(p,{year,key,share:(1-EVENT_OFFSEASON)/MONTH_TICKS,fit,t,inSeason:true});
+  const changed=grow(p,baseChange(p,fit,t)*MONTH_SHARE,key+':m',p.age<=26);
+  if(event)merge(changed,grow(p,event.now,key+':e',p.age<=26));
+  p.pot=potCap(p.pot,p.ovr);
+  return {changed,before,event};
+}
+
+/** 오프시즌 틱(나이 +1 뒤 새 나이). 시즌 평균 적정 계수로 연간 변화의 70% + 개인차 + pending, 각성·급락, POT 규칙. */
+export function rollOffseason(p,{year,mine,top,fit}){
+  const dev=ensureDev(p),t=traits(p.id),key=`${p.id}:${year}:0`,before={ovr:p.ovr,pot:p.pot},age=p.age;
+  if(!fit){
+    if(mine&&dev.fit.n)fit={tag:'season',grow:dev.fit.sum/dev.fit.n,burst:dev.fit.bsum/dev.fit.n};
+    else{fit=judgeFit(p,{mine,played:true});if(fit?.tag==='firstOk'&&top.has(p.id))fit={...fit,burst:3};}
+  }
+  const pending=dev.pending;dev.pending=0;
+  const event=rollEvent(p,{year,key,share:EVENT_OFFSEASON,fit,t,inSeason:false});
+  const dOvr=baseChange(p,fit,t)*OFFSEASON_SHARE+NOISE_SD*normal(key+':noise')+pending+(event?.now||0);
+  const changed=grow(p,dOvr,key,age<=26);
+  if(age>=27||p.foreign)p.pot=p.ovr;
+  else if(age>=24){let rest=0;for(let a=age+1;a<=26;a++)rest+=curve(a);p.pot=Math.round(p.pot+(p.ovr+rest-p.pot)*.25);}
+  p.pot=potCap(p.pot,p.ovr);
+  dev.fit={sum:0,n:0,bsum:0};dev.mark={pa:0,outs:0};
+  return {changed,before,event};
 }

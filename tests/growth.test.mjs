@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ovr,weightedRating,OVR_BASE,OVR_SPREAD} from '../game/player-ratings.js';
-import {curve,rand,normal,between,traits,bloomFactor,judgeFit,playedEnough,ops,era,topPerformers,applyDelta,grow,ensureDev} from '../game/growth.js';
+import {curve,rand,normal,between,traits,bloomFactor,judgeFit,playedEnough,ops,era,topPerformers,applyDelta,grow,ensureDev,rollMonth,rollOffseason} from '../game/growth.js';
 
 const hitter=(id,age,r=50,pos='2B')=>{const p={id,name:id,team:'KT 위즈',pitcher:false,pos,age,group:'first',ratings:{contact:r,eye:r,power:r,speed:r,defense:r},stats:{batting:{},pitching:{}},history:{}};p.ovr=ovr(p);p.pot=80;ensureDev(p);return p;};
 const pitcher=(id,age,r=50,stamina=55)=>{const p={id,name:id,team:'KT 위즈',pitcher:true,pos:'SP',age,group:'first',ratings:{velocity:r,stuff:r,control:r,stamina},stats:{batting:{},pitching:{}},history:{}};p.ovr=ovr(p);p.pot=80;ensureDev(p);return p;};
@@ -102,4 +102,109 @@ test('grow: 성장기(capped)는 POT를 넘지 않는다, 하락은 제한 없�
   }
   const old=hitter('old',30,50);old.pot=old.ovr;
   grow(old,3,'old',false);assert.ok(old.ovr>old.pot);
+});
+
+const none=new Set(),flat={grow:1,burst:0};
+
+test('오프시즌 평균 변화 = 곡선 × 70% (+ 34세 이상 급락 기대값)',()=>{
+  for(const age of [21,23,25,26,30,33,35,37,39]){
+    const d=[];
+    for(let i=0;i<1000;i++){const h=hitter(`o${age}-${i}`,age),o=score(h);rollOffseason(h,{year:2026,mine:false,top:none,fit:flat});d.push(score(h)-o);}
+    const want=curve(age)*.7+(age>=34?.05*.6*-5:0);
+    assert.ok(Math.abs(avg(d)-want)<.3,`${age}세: 평균 ${avg(d).toFixed(2)} 기대 ${want}`);
+  }
+});
+
+test('월간: 곡선 × 5% × 계수, 적정 리그 누적과 출전량 기준점',()=>{
+  const d=[];
+  for(let i=0;i<1000;i++){const h=hitter(`m${i}`,21),o=score(h);rollMonth(h,{year:2026,month:5,mine:false,top:none,fit:flat});d.push(score(h)-o);}
+  assert.ok(Math.abs(avg(d)-4.5*.05)<.1,`평균 ${avg(d)}`);
+  const p=hitter('acc',20,35);p.group='second';p.stats.batting.pa=12;
+  rollMonth(p,{year:2026,month:5,mine:true,top:none});
+  assert.deepEqual(p.dev.fit,{sum:1.2,n:1,bsum:2});
+  assert.deepEqual(p.dev.mark,{pa:12,outs:0});
+  const vet=hitter('vet',30);vet.stats.batting.pa=80;
+  rollMonth(vet,{year:2026,month:5,mine:true,top:none});
+  assert.equal(vet.dev.fit.n,0);
+});
+
+test('1군 적정 + 성적 상위면 각성 배율 3',()=>{
+  const p=hitter('star',22,60);p.stats.batting.pa=60;
+  rollMonth(p,{year:2026,month:5,mine:true,top:new Set(['star'])});
+  assert.equal(p.dev.fit.bsum,3);
+});
+
+test('범위: 성장기 POT 상한, 능력치 정수 20–80, 27세 이상 POT = OVR, pot ≥ ovr',()=>{
+  for(let i=0;i<300;i++){
+    const y=hitter(`r${i}`,22,45);y.pot=y.ovr+1;const cap=y.pot;
+    rollOffseason(y,{year:2026,mine:false,top:none,fit:{grow:1.2,burst:0}});
+    assert.ok(y.ovr<=cap);assert.ok(y.pot>=y.ovr);
+    assert.ok(Object.values(y.ratings).every(v=>Number.isInteger(v)&&v>=20&&v<=80));
+    const v=hitter(`s${i}`,28+(i%12),55);v.pot=70;
+    rollOffseason(v,{year:2026,mine:false,top:none});
+    assert.equal(v.pot,v.ovr);
+  }
+});
+
+test('POT: 23세 이하는 각성 없이 그대로, 24–26세는 예상 도달치로 25% 이동',()=>{
+  const y=hitter('p22',22,45);y.pot=70;
+  rollOffseason(y,{year:2026,mine:false,top:none,fit:flat});
+  assert.equal(y.pot,70);
+  const m=hitter('p25',25,45);m.pot=75;
+  rollOffseason(m,{year:2026,mine:false,top:none,fit:flat});
+  const want=Math.max(m.ovr,Math.round(75+(m.ovr+curve(26)-75)*.25));
+  assert.equal(m.pot,want);
+});
+
+test('각성·급락 확률(오프시즌 60%)과 한 해 한 번',()=>{
+  let b=0,c=0;
+  for(let i=0;i<10000;i++){
+    const y=hitter(`e${i}`,22,40);if(rollOffseason(y,{year:2026,mine:false,top:none}).event?.type==='breakout')b++;
+    const o=hitter(`f${i}`,36,55);if(rollOffseason(o,{year:2026,mine:false,top:none}).event?.type==='collapse')c++;
+  }
+  assert.ok(Math.abs(b/10000-.05*2*.6)<.012,`각성 ${b}`);
+  assert.ok(Math.abs(c/10000-.05*.6)<.008,`급락 ${c}`);
+  let blocked=0;
+  for(let i=0;i<2000;i++){const y=hitter(`g${i}`,22,40);y.dev.eventYear=2026;if(rollOffseason(y,{year:2026,mine:false,top:none}).event)blocked++;}
+  assert.equal(blocked,0);
+});
+
+test('시즌 중 각성: POT 즉시 상승, 추가 성장 절반은 pending, 오프시즌에 정산',()=>{
+  let p,r;
+  for(let i=0;!r?.event;i++){p=hitter(`sb${i}`,22,40);p.pot=60;r=rollMonth(p,{year:2026,month:6,mine:false,top:none});}
+  assert.equal(r.event.type,'breakout');
+  assert.ok(p.pot-60>=8&&p.pot-60<=15,`POT +${p.pot-60}`);
+  assert.ok(p.dev.pending>0);
+  assert.equal(p.dev.eventYear,2026);
+  p.age++;
+  const off=rollOffseason(p,{year:2026,mine:false,top:none});
+  assert.equal(off.event,null);
+  assert.equal(p.dev.pending,0);
+  assert.deepEqual(p.dev.fit,{sum:0,n:0,bsum:0});
+});
+
+test('시즌 중 급락: 즉시 약 −3, pending −2',()=>{
+  let p,r,o;
+  for(let i=0;!r?.event;i++){p=hitter(`sc${i}`,36,55);o=score(p);r=rollMonth(p,{year:2026,month:6,mine:false,top:none});}
+  assert.equal(r.event.type,'collapse');
+  assert.ok(o-score(p)>=2&&o-score(p)<=4.5,`즉시 ${score(p)-o}`);
+  assert.equal(p.dev.pending,-2);
+});
+
+test('외국인: 성장·각성 없음, POT = OVR, 하락은 국내와 같다',()=>{
+  for(let i=0;i<300;i++){
+    const f=hitter(`fx${i}`,24,50);f.foreign=true;f.pot=f.ovr;const o=f.ovr;
+    for(let m=4;m<=9;m++)rollMonth(f,{year:2026,month:m,mine:false,top:none});
+    const r=rollOffseason(f,{year:2026,mine:false,top:none});
+    assert.equal(r.event,null);assert.ok(f.ovr<=o,`${o} → ${f.ovr}`);assert.equal(f.pot,f.ovr);
+  }
+  const d=[];
+  for(let i=0;i<1000;i++){const f=hitter(`fo${i}`,36,55);f.foreign=true;const o=score(f);rollOffseason(f,{year:2026,mine:false,top:none,fit:flat});d.push(score(f)-o);}
+  assert.ok(Math.abs(avg(d)-(-3*.7-.05*.6*5))<.3,`평균 ${avg(d)}`);
+});
+
+test('27–29세 각성: 오프시즌 뒤 POT가 OVR을 따라간다, 평균 +4 가산',()=>{
+  const gain=[];
+  for(let i=0;gain.length<40;i++){const p=hitter(`pr${i}`,28,50);p.pot=p.ovr;const o=score(p),r=rollOffseason(p,{year:2026,mine:false,top:none});if(r.event){assert.equal(r.event.type,'breakout');assert.equal(p.pot,p.ovr);gain.push(score(p)-o);}}
+  assert.ok(Math.abs(avg(gain)-4)<1,`평균 ${avg(gain)}`); // +3~5 균등(평균 4) + 개인차(평균 0)
 });
