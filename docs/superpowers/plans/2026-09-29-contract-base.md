@@ -1122,11 +1122,15 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 `tests/contract-finance.test.mjs` import에 `import {initialState,teams as clubNames,teamPlayers} from '../model.js';`를 더하고 추가:
 
 ```js
-test('초기 연봉 보정: 팀 국내 총연봉 80억~140억(캡 이하), 리그 평균은 캡의 70~85%',()=>{
-  const s=initialState(),pays=clubNames.map((_,i)=>domesticPayroll(teamPlayers(s,i)));
-  pays.forEach((v,i)=>assert.ok(v>=800000&&v<=FIN.cap,`${clubNames[i]} ${money(v)}`));
-  const avg=pays.reduce((a,b)=>a+b,0)/pays.length;
-  assert.ok(avg>=.7*FIN.cap&&avg<=.85*FIN.cap,`평균 ${money(avg)}`);
+// KBO 공식 2026 구단 평균 연봉(만 원, 신인·외국인 제외). 팀 번호 순: KT 삼성 한화 SSG 키움 NC LG 롯데 두산 KIA
+const REAL_AVG=[19878,18863,17613,20783,10022,13168,20094,17654,20776,15623];
+test('초기 연봉 보정: 팀 국내 총연봉이 실제 구단 평균 × 52명의 ±25% 이내이고 캡 이하',()=>{
+  const s=initialState();
+  clubNames.forEach((name,i)=>{
+    const v=domesticPayroll(teamPlayers(s,i)),target=REAL_AVG[i]*52;
+    assert.ok(v>=target*.75&&v<=target*1.25,`${name} ${money(v)} (목표 ${money(target)})`);
+    assert.ok(v<=FIN.cap,`${name} 캡 초과 ${money(v)}`);
+  });
 });
 ```
 
@@ -1140,7 +1144,7 @@ Run: `node --test tests/contract-finance.test.mjs`
 node -e "Promise.all([import('./model.js'),import('./game/contract/finance.js')]).then(([m,f])=>{const s=m.initialState();m.teams.forEach((t,i)=>{const r=m.teamPlayers(s,i);console.log(t,f.money(f.domesticPayroll(r)),'실제값',f.money(r.filter(p=>!p.foreign&&!p.generated).reduce((a,p)=>a+p.contract.salary,0)));});})"
 ```
 
-- 평균이 낮거나 높으면 `FIN.marketUnit`을 5,000(0.5억) 단위로 조정하고 다시 실행한다.
+- 대부분 팀이 목표보다 낮거나 높으면 `FIN.marketUnit`을 5,000(0.5억) 단위로 조정하고 다시 실행한다. 한두 팀만 벗어나면(조사 데이터에 없는 다년 계약자 때문일 수 있음) 조정하지 말고 팀·금액을 사용자에게 보고한다.
 - **어떤 팀이 PR 0 실제값만으로 캡(140억)을 넘으면 데이터나 캡을 임의로 바꾸지 말고 멈춘다.** 팀 이름과 금액을 사용자에게 보고하고 결정(캡 상향 / 그대로 두고 해당 팀은 방출만 가능)을 받는다(스펙: 시작부터 넘는 팀은 보고).
 
 Expected: PASS
