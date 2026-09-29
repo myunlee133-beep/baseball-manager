@@ -4,6 +4,7 @@ import {standings,closeSeason,ageLeague,prepareNextSeason} from '../league-seaso
 import {teams,teamPlayers,positions} from '../../model.js';
 import {settleIncome} from './finance.js';
 import {FILL} from './league-fill.js';
+import {runRetirements,aiReleaseOverflow,ageFreeAgents,retireUnsigned} from './release.js';
 
 export const STEPS=['close','retire','salary','fa','foreign','roster'];
 export const STEP_LABELS={close:'시즌 마감',retire:'은퇴·방출',salary:'연봉 협상',fa:'FA',foreign:'외국인 계약',roster:'로스터 확정'};
@@ -13,7 +14,7 @@ export function beginOffseason(state){
   const order=standings(state).map(r=>r.team),year=state.season.year;
   settleIncome(state,order);
   closeSeason(state);
-  state.offseason={step:'close',year,finalOrder:order,log:[`${year} 시즌 종료 · 1위 ${teams[order[0]]}`]};
+  state.offseason={step:'close',year,finalOrder:order,log:[`${year} 시즌 종료 · 1위 ${teams[order[0]]}`],freeAgents:[],retired:[]};
   return true;
 }
 export function rosterProblems(state){
@@ -23,17 +24,21 @@ export function rosterProblems(state){
   if(state.rotation.length<5)warnings.push(`선발 로테이션 ${state.rotation.length}명`);
   return {over,warnings};
 }
-/** 다음 단계로. ②를 떠날 때 노화, ⑥을 떠날 때 55명 검사 후 새 시즌 준비. 넘어가지 못하면 false. */
+/** 다음 단계로. ①→② 은퇴 판정, ②를 떠날 때 AI 방출·노화, ⑥을 떠날 때 AI 방출·55명 검사·미계약자 은퇴 후 새 시즌. 넘어가지 못하면 false. */
 export function nextStep(state){
   const o=state.offseason;
   if(!o)return false;
+  o.freeAgents??=[];
   if(o.step==='roster'){
+    aiReleaseOverflow(state);
     if(rosterProblems(state).over.length)return false;
+    retireUnsigned(state);
     prepareNextSeason(state);
     state.offseason=null;
     return true;
   }
-  if(o.step==='retire'){ageLeague(state);o.log.push('선수단 나이 +1 · 성장·노화 반영');}
+  if(o.step==='retire'){aiReleaseOverflow(state);ageLeague(state);ageFreeAgents(state);o.log.push('선수단 나이 +1 · 성장·노화 반영');}
   o.step=STEPS[STEPS.indexOf(o.step)+1];
+  if(o.step==='retire')runRetirements(state);
   return true;
 }
