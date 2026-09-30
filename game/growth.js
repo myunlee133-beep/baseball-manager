@@ -2,6 +2,8 @@
 /** 3단계 성장·퇴화. 월간·오프시즌 틱에서 저장 능력치(20–80)를 나이 곡선대로 움직이고 OVR·POT를 다시 계산한다. 상태는 제자리 변경한다.
  *  규칙과 숫자는 docs/superpowers/specs/2026-09-29-growth-decay-design.md. 튜닝은 scripts/growth-smoke.mjs 결과로 한다. */
 import {ovr,potCap,isReliever,weightsFor,OVR_BASE,OVR_SPREAD} from './player-ratings.js';
+import {teams,teamPlayers} from '../model.js';
+import {pushMessage} from './inbox.js';
 
 export const OFFSEASON_SHARE=.7,MONTH_SHARE=.05,MONTH_TICKS=6,NOISE_SD=2;
 export const FIRST_MIN_OVR=42,SECOND_MAX_OVR=48;
@@ -164,4 +166,61 @@ export function rollOffseason(p,{year,mine,top,fit}){
   p.pot=potCap(p.pot,p.ovr);
   dev.fit={sum:0,n:0,bsum:0};dev.mark={pa:0,outs:0};
   return {changed,before,event};
+}
+
+export const SCOUT='스카우트 팀장';
+const everyone=state=>teams.flatMap((_,i)=>teamPlayers(state,i).map(p=>({p,mine:i===0})));
+const sign=v=>v>0?`+${v}`:v<0?`−${-v}`:'0';
+const fmtChanges=c=>Object.entries(c).map(([k,v])=>`${LABEL[k]} ${sign(v)}`).join(' · ');
+
+function eventMessage({p,type,before}){
+  if(type==='breakout')return {subject:`긴급 스카우트 리포트: ${p.name}, ${p.pitcher?'투구':'타격'}에 눈을 떴습니다`,
+    body:[{p:`${p.name}(${p.age}세)의 기량이 한 단계 올라섰습니다. 평가를 올립니다.`},{table:{head:['','이전','이후'],rows:[['OVR',before.ovr,p.ovr],['POT',before.pot,p.pot]]}}]};
+  return {subject:`긴급 스카우트 리포트: ${p.name}의 기량이 눈에 띄게 떨어졌습니다`,
+    body:[{p:`${p.name}(${p.age}세)에게서 하락 조짐이 뚜렷합니다.`},{table:{head:['','이전','이후'],rows:[['OVR',before.ovr,p.ovr]]}}]};
+}
+/** 내 팀 이벤트는 중요 메시지, 다른 팀 이벤트는 시즌 중에만 리그 소식 한 줄. */
+function announce(state,events,inSeason){
+  for(const e of events){
+    if(e.mine)pushMessage(state,{from:SCOUT,importance:'high',...eventMessage(e)});
+    else if(inSeason)state.season.news=[...state.season.news,`${e.p.team} ${e.p.name}, ${e.type==='breakout'?'기량 급성장':'기량 급락'}`].slice(-20);
+  }
+}
+
+/** hooks.monthlyTick. 새 달 1일에 호출된다. */
+export function monthlyGrowth(state){
+  const s=state.season,year=s.year,month=Number(s.date.slice(5,7));
+  const frac=s.schedule.filter(g=>g.status==='final').length/Math.max(1,s.schedule.length);
+  const list=everyone(state),top=topPerformers(list.map(x=>x.p),frac,p=>p.stats);
+  const rows=[],events=[];
+  for(const {p,mine} of list){
+    const r=rollMonth(p,{year,month,mine,top});
+    if(r.event)events.push({p,mine,type:r.event.type,before:r.before});
+    if(mine&&Object.keys(r.changed).length)rows.push([p.name,fmtChanges(r.changed),`${r.before.ovr} → ${p.ovr}`]);
+  }
+  if(rows.length)pushMessage(state,{from:SCOUT,subject:`${month-1}월 스카우트 리포트`,
+    body:[{p:`지난달 능력치가 바뀐 선수 ${rows.length}명입니다.`},{table:{head:['선수','변화','OVR'],rows}}]});
+  announce(state,events,true);
+  return {events};
+}
+
+/** hooks.offseasonTick. 나이 +1 뒤, 새 시즌 생성 전에 호출된다. state.season.year 는 끝난 시즌. */
+export function offseasonGrowth(state){
+  const year=state.season.year,list=everyone(state);
+  const top=topPerformers(list.map(x=>x.p),1,p=>p.history?.[year]);
+  const mineRows=[],events=[];
+  for(const {p,mine} of list){
+    const h=(p.history??={})[year]??={};h.ovr=p.ovr;h.pot=p.pot;
+    const r=rollOffseason(p,{year,mine,top});
+    if(r.event)events.push({p,mine,type:r.event.type,before:r.before});
+    if(mine)mineRows.push({p,before:r.before});
+  }
+  mineRows.sort((a,b)=>Math.abs(b.p.ovr-b.before.ovr)-Math.abs(a.p.ovr-a.before.ovr));
+  const body=[{p:`${year} 시즌을 마친 뒤의 평가입니다. 나이는 새 시즌 기준입니다.`},
+    {table:{head:['선수','나이','OVR','POT'],rows:mineRows.map(({p,before})=>[p.name,p.age,`${before.ovr} → ${p.ovr} (${sign(p.ovr-before.ovr)})`,`${before.pot} → ${p.pot}`])}}];
+  if(events.length)body.push({p:'리그 전체 각성·급락'},{table:{head:['구단','선수','나이','구분','OVR'],
+    rows:events.map(e=>[e.p.team,e.p.name,e.p.age,e.type==='breakout'?'각성':'급락',`${e.before.ovr} → ${e.p.ovr}`])}});
+  announce(state,events,false);
+  pushMessage(state,{from:SCOUT,importance:'high',subject:`${year} 오프시즌 스카우트 리포트`,body});
+  return {events};
 }

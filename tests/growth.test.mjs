@@ -2,7 +2,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ovr,weightedRating,OVR_BASE,OVR_SPREAD} from '../game/player-ratings.js';
-import {curve,rand,normal,between,traits,bloomFactor,judgeFit,playedEnough,ops,era,topPerformers,applyDelta,grow,ensureDev,rollMonth,rollOffseason} from '../game/growth.js';
+import {curve,rand,normal,between,traits,bloomFactor,judgeFit,playedEnough,ops,era,topPerformers,applyDelta,grow,ensureDev,rollMonth,rollOffseason,monthlyGrowth,offseasonGrowth,SCOUT} from '../game/growth.js';
+import {initialState} from '../model.js';
+import {ensureSeason,allPlayers} from '../game/league-season.js';
 
 const hitter=(id,age,r=50,pos='2B')=>{const p={id,name:id,team:'KT 위즈',pitcher:false,pos,age,group:'first',ratings:{contact:r,eye:r,power:r,speed:r,defense:r},stats:{batting:{},pitching:{}},history:{}};p.ovr=ovr(p);p.pot=80;ensureDev(p);return p;};
 const pitcher=(id,age,r=50,stamina=55)=>{const p={id,name:id,team:'KT 위즈',pitcher:true,pos:'SP',age,group:'first',ratings:{velocity:r,stuff:r,control:r,stamina},stats:{batting:{},pitching:{}},history:{}};p.ovr=ovr(p);p.pot=80;ensureDev(p);return p;};
@@ -207,4 +209,42 @@ test('27–29세 각성: 오프시즌 뒤 POT가 OVR을 따라간다, 평균 +4 
   const gain=[];
   for(let i=0;gain.length<40;i++){const p=hitter(`pr${i}`,28,50);p.pot=p.ovr;const o=score(p),r=rollOffseason(p,{year:2026,mine:false,top:none});if(r.event){assert.equal(r.event.type,'breakout');assert.equal(p.pot,p.ovr);gain.push(score(p)-o);}}
   assert.ok(Math.abs(avg(gain)-4)<1,`평균 ${avg(gain)}`); // +3~5 균등(평균 4) + 개인차(평균 0)
+});
+
+const league=()=>{const s=ensureSeason(initialState());s.season.date='2026-04-01';return s;};
+
+test('월간 리포트: 내 팀 변화가 없으면 보내지 않는다',()=>{
+  const s=league();
+  for(const p of s.players)p.age=30; // 곡선 0, 각성(≤29)·급락(≥34) 대상 아님
+  monthlyGrowth(s);
+  assert.equal(s.inbox.filter(m=>m.from===SCOUT).length,0);
+});
+
+test('월간 리포트: 변화가 있으면 일반 메시지 한 통, 표에 바뀐 선수',()=>{
+  const s=league();
+  for(const p of s.players)p.age=20;
+  const {events}=monthlyGrowth(s);
+  const report=s.inbox.find(m=>m.subject==='3월 스카우트 리포트');
+  assert.ok(report);assert.equal(report.importance,'normal');
+  const rows=report.body.find(b=>b.table).table.rows;
+  assert.ok(rows.length>0);
+  assert.ok(rows.every(r=>s.players.some(p=>p.name===r[0])));
+  const mineEvents=events.filter(e=>e.mine).length;
+  assert.equal(s.inbox.filter(m=>m.importance==='high').length,mineEvents);
+  const others=events.filter(e=>!e.mine).length;
+  assert.equal(s.season.news.filter(l=>l.includes('기량 급')).length,Math.min(others,20));
+});
+
+test('오프시즌: history 에 변화 전 OVR·POT, 리포트는 중요 메시지, 재현성',()=>{
+  const a=league(),b=league();
+  const before=new Map(allPlayers(a).map(p=>[p.id,{ovr:p.ovr,pot:p.pot}]));
+  for(const s of [a,b])for(const p of allPlayers(s))p.age++;
+  const {events}=offseasonGrowth(a);offseasonGrowth(b);
+  assert.deepEqual(a.players,b.players);assert.deepEqual(a.league,b.league);
+  for(const p of allPlayers(a))assert.deepEqual({ovr:p.history[2026].ovr,pot:p.history[2026].pot},before.get(p.id));
+  const report=a.inbox.find(m=>m.subject==='2026 오프시즌 스카우트 리포트');
+  assert.ok(report);assert.equal(report.importance,'high');
+  assert.equal(report.body.find(b=>b.table).table.rows.length,a.players.length);
+  assert.equal(a.inbox.filter(m=>m.importance==='high').length,1+events.filter(e=>e.mine).length);
+  assert.ok(allPlayers(a).every(p=>p.pot>=p.ovr&&(p.age<27||p.pot===p.ovr)));
 });
