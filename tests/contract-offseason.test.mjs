@@ -4,6 +4,7 @@ import {initialState} from '../model.js';
 import {ensureSeason,hooks,closeSeason,ageLeague,prepareNextSeason} from '../game/league-season.js';
 import {STEPS,beginOffseason,nextStep,rosterProblems} from '../game/contract/offseason.js';
 import {offseasonMarkup} from '../offseason-ui.js';
+import {releasePlayer} from '../game/contract/release.js';
 
 const ended=()=>{const s=ensureSeason(initialState());s.season.phase='ended';return s;};
 
@@ -61,15 +62,42 @@ test('①~⑥ 진행: 수입 정산, 노화는 ②→③에서 한 번, 끝나�
   }finally{hooks.offseasonTick=orig;}
 });
 
-test('55명을 넘는 구단이 있으면 새 시즌으로 넘어가지 않는다',()=>{
+test('내 팀이 55명을 넘으면 새 시즌으로 넘어가지 않는다',()=>{
   const s=ended();
   beginOffseason(s);
   while(s.offseason.step!=='roster')nextStep(s);
-  s.league[3].push({...structuredClone(s.league[3].at(-1)),id:'3-extra'});
-  assert.deepEqual(rosterProblems(s).over,[{team:3,count:56}]);
+  for(let i=0;i<6;i++)s.players.push({...structuredClone(s.players.at(-1)),id:`0-extra-${i}`});
+  const n=s.players.length;
+  assert.deepEqual(rosterProblems(s).over,[{team:0,count:n}]);
   assert.equal(nextStep(s),false);
   assert.equal(s.offseason.step,'roster');
   assert.equal(s.season.year,2026);
+});
+
+test('AI 구단이 55명을 넘으면 ⑥을 떠날 때 자동 방출되고, 시장에 남은 선수는 은퇴한다',()=>{
+  const s=ended();
+  beginOffseason(s);
+  while(s.offseason.step!=='roster')nextStep(s);
+  for(let i=0;i<6;i++)s.league[3].push({...structuredClone(s.league[3].at(-1)),id:`3-extra-${i}`,ovr:99});
+  const log=s.offseason.log;
+  assert.equal(nextStep(s),true);
+  assert.ok(log.some(l=>/미계약 자유계약 선수 \d+명 은퇴/.test(l)));
+  assert.equal(s.league[3].length,55);
+  assert.equal(s.offseason,null);
+  assert.equal(s.season.year,2027);
+});
+
+test('②에 들어올 때 은퇴가 판정되고, 떠날 때 시장 선수도 나이를 먹는다',()=>{
+  const s=ended();
+  beginOffseason(s);
+  assert.deepEqual(s.offseason.freeAgents,[]);
+  nextStep(s);
+  assert.equal(s.offseason.step,'retire');
+  assert.ok(s.offseason.retired.length>0);
+  s.offseason.freeAgents.push({...structuredClone(s.players.at(-1)),id:'fa-1',fromTeam:0,contract:null});
+  const age=s.offseason.freeAgents[0].age;
+  nextStep(s);
+  assert.equal(s.offseason.freeAgents[0].age,age+1);
 });
 
 test('내 팀 편성 경고: 빈 수비 위치, 선발 5명 미만',()=>{
@@ -92,4 +120,36 @@ test('오프시즌 화면: 현재 단계 CTA, 앞 단계 잠금, 끝난 단계 �
   assert.doesNotMatch(html,/generated/);
   while(s.offseason.step!=='roster')nextStep(s);
   assert.match(offseasonMarkup(s,{tab:null,panel,standingsTable:()=>''}),/새 시즌 시작/);
+});
+
+test('② 화면: 은퇴 목록과 내 팀 방출 버튼, ⑥ 화면: 자유계약 시장 영입 버튼',()=>{
+  const s=ended();
+  beginOffseason(s);nextStep(s);
+  const panel=(t,b)=>`<section><h2>${t}</h2>${b}</section>`,opts={tab:null,panel,standingsTable:()=>''};
+  const two=offseasonMarkup(s,opts);
+  assert.match(two,/은퇴 선수/);
+  assert.match(two,new RegExp(s.offseason.retired[0].name));
+  assert.match(two,new RegExp(`data-release="${s.players.at(-1).id}"`));
+  const id=s.players.at(-1).id;
+  releasePlayer(s,id);
+  while(s.offseason.step!=='roster')nextStep(s);
+  const six=offseasonMarkup(s,opts);
+  assert.match(six,/자유계약 시장/);
+  assert.match(six,new RegExp(`data-sign="${id}"`));
+  assert.match(six,/data-release=/);
+});
+
+test('② 탭을 지난 단계에서 다시 열면 방출 버튼이 없다',()=>{
+  const s=ended();
+  beginOffseason(s);nextStep(s);nextStep(s);
+  assert.equal(s.offseason.step,'salary');
+  const panel=(t,b)=>`<section><h2>${t}</h2>${b}</section>`;
+  assert.doesNotMatch(offseasonMarkup(s,{tab:'retire',panel,standingsTable:()=>''}),/data-release=/);
+});
+
+test('새 시즌 뉴스에 오프시즌 은퇴 한 줄이 남는다',()=>{
+  const s=ended();
+  beginOffseason(s);
+  while(s.offseason)nextStep(s);
+  assert.ok(s.season.news.some(l=>/오프시즌 은퇴/.test(l)));
 });
