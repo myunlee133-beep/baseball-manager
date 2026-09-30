@@ -15,3 +15,12 @@
 .advance{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
 .offnote{padding:14px 21px;display:grid;gap:8px}.offnote p{margin:0}
+nav .badge{display:inline-block;min-width:18px;padding:1px 5px;margin-left:4px;border-radius:9px;background:var(--red);color:#1a0f10;font-size:11px;font-weight:800;text-align:center}
+.delta{font-size:10px;margin-left:3px;font-weight:700}.delta.up{color:var(--mint)}.delta.down{color:var(--red)}
+.mailgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:20px}.maillist{max-height:620px;overflow:auto}
+.mailrow{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;padding:12px 18px;border-bottom:1px solid var(--line);color:#b8c7d2}
+.mailrow.unread{color:#e7edf2;font-weight:700}.mailrow.active{background:#1c3040}.mailflag{color:var(--red);font-weight:800}
+.mailsubject small{display:block;color:var(--muted);font-weight:400;margin-top:3px;font-size:11px}.maildate{color:var(--muted);font-size:11px}
+.maildetail{padding:20px 22px;display:grid;gap:14px}.maildetail p{color:#c3d1dc;line-height:1.8}.mailhead h2{font-size:17px}.mailhead small{color:var(--muted)}
+.mailtable{max-height:420px}.mailtable td,.mailtable th{text-align:left}.mailback{display:none;justify-self:start}
+@media(max-width:760px){.mailgrid{grid-template-columns:1fr}.mailgrid.reading>.panel:first-child,.mailgrid:not(.reading)>.panel:last-child{display:none}.mailback{display:inline-block}}
