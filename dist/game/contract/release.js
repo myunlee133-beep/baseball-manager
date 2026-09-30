@@ -37,7 +37,7 @@ export function runRetirements(state){
 }
 export function releasePlayer(state,id){
   const o=state.offseason,p=state.players.find(x=>x.id===id);
-  if(!o||!['retire','roster'].includes(o.step)||!p)return false;
+  if(!o||!['retire','salary','roster'].includes(o.step)||!p)return false;
   removeFromTeam(state,0,id);
   (o.freeAgents??=[]).push(toFreeAgent(p,0));
   o.log.push(`${teams[0]} ${p.name} 방출`);
