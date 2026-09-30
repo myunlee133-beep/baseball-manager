@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {initialState} from '../model.js';
 import {hooks,ensureSeason,todayGames,myGame,playLeagueGame,finishDay,standings,seasonLine,allPlayers,loadBox,flushBoxes,startNextSeason,lineupProblem} from '../game/league-season.js';
+import {beginOffseason,nextStep} from '../game/contract/offseason.js';
 
 const store=new Map();
 globalThis.localStorage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
@@ -67,6 +68,26 @@ test('시즌 종료 → 다음 시즌: 기록 보관, 나이 +1, offseasonTick, 
   assert.equal(s.season.year,2027);
   assert.equal(s.season.date,'2027-03-27');
   assert.equal(store.has('dugout-boxes-2026'),false);
+});
+
+test('다음 시즌으로: 실제 성장 훅이 돌아 history 에 OVR·POT, 오프시즌 리포트',()=>{
+  const s=fresh();
+  const before=new Map(allPlayers(s).map(p=>[p.id,{ovr:p.ovr,pot:p.pot}]));
+  startNextSeason(s);
+  for(const p of allPlayers(s))assert.deepEqual({ovr:p.history[2026].ovr,pot:p.history[2026].pot},before.get(p.id));
+  assert.ok(s.inbox.some(m=>m.subject==='2026 오프시즌 스카우트 리포트'));
+});
+
+test('오프시즌 단계: ② 은퇴·방출을 떠날 때(노화) 성장이 돌고 리포트가 온다',()=>{
+  const s=fresh();s.season.phase='ended';
+  assert.ok(beginOffseason(s));
+  assert.equal(s.inbox.length,0);
+  nextStep(s); // ① → ②
+  assert.equal(s.inbox.length,0);
+  nextStep(s); // ② → ③: ageLeague → offseasonTick
+  assert.equal(s.offseason.step,'salary');
+  assert.ok(s.inbox.some(m=>m.subject==='2026 오프시즌 스카우트 리포트'&&m.importance==='high'));
+  assert.ok(allPlayers(s).every(p=>p.history[2026].ovr!=null));
 });
 
 test('seasonLine: 엔진 기록 줄을 기록실 필드로 바꾼다',()=>{

@@ -5,10 +5,10 @@ import {buildSchedule,openingDay,addDays} from './league-schedule.js';
 import {spendEnergy,recoverDay} from './season-fatigue.js';
 import {createLeagueGame} from '../game-bridge.js';
 import {teams,teamPlayers,positions} from '../model.js';
-import {ensureDev} from './growth.js';
+import {ensureDev,monthlyGrowth,offseasonGrowth} from './growth.js';
 
-/** 3단계 연결점. 2단계에서는 비어 있다. */
-export const hooks={monthlyTick(state){},offseasonTick(state){}};
+/** 3단계 성장·퇴화 연결점. 테스트는 이 객체의 함수를 바꿔 끼운다. */
+export const hooks={monthlyTick:monthlyGrowth,offseasonTick:offseasonGrowth};
 
 const blankStats=()=>({batting:{},pitching:{}});
 export function createSeason(year){
