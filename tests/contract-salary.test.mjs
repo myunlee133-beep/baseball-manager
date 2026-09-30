@@ -74,15 +74,22 @@ test('낮은 제시: 판정은 재현 가능, 거절이면 연봉조정으로 �
 
 test('전원 수용과 확정: 대상은 요구액 보류 1년, 다년은 1년 줄고, FA 자격자는 재계약·재자격 +4, 외국인 그대로',()=>{
   const s=off();
-  const multi=s.players.find(p=>p.contract?.years>1),fa=s.players.find(p=>!p.foreign&&p.faYear===2026&&p.contract.years===1),foreign=s.players.find(p=>p.foreign);
-  const multiYears=multi?.years??multi?.contract.years,foreignC=structuredClone(foreign.contract);
+  let multi=s.players.find(p=>p.contract?.years>1);
+  let fa=s.players.find(p=>!p.foreign&&p.faYear===2026&&p.contract.years===1);
+  const foreign=s.players.find(p=>p.foreign);
+  if(!multi){const d=s.players.find(p=>!p.foreign);d.contract={salary:10000,years:3,kind:'fa'};multi=d;}
+  if(!fa){const d=s.players.find(p=>!p.foreign&&!multi||p.id!==multi.id);d.faYear=2026;d.contract={salary:5000,years:1,kind:'reserve'};fa=d;}
+  const multiYears=multi.contract.years,foreignC=structuredClone(foreign.contract);
   const n=acceptAllDemands(s);
   assert.ok(n>0);
   assert.ok(Object.values(s.offseason.salary).every(r=>r.result==='demand'));
   settleSalaries(s);
   for(const p of s.players.filter(p=>s.offseason.salary[p.id]))assert.deepEqual(p.contract,{salary:s.offseason.salary[p.id].salary,years:1,kind:'reserve'});
-  if(multi)assert.equal(multi.contract.years,multiYears-1);
-  if(fa){assert.equal(fa.faYear,2030);assert.equal(fa.contract.years,1);}
+  assert.ok(multi,'다년 계약 선수 없음');
+  assert.equal(multi.contract.years,multiYears-1);
+  assert.ok(fa,'FA 자격 선수 없음');
+  assert.equal(fa.faYear,2030);
+  assert.equal(fa.contract.years,1);
   assert.deepEqual(foreign.contract,foreignC);
 });
 
@@ -92,6 +99,7 @@ test('AI는 전원 요구액 수용, 캡을 넘으면 OVR 낮은 국내 선수�
   settleSalaries(s);
   assert.ok(domesticPayroll(s.league[3])<=s.finance.cap);
   assert.ok(s.offseason.freeAgents.some(p=>p.fromTeam===3));
+  assert.ok(s.offseason.freeAgents.filter(p=>p.fromTeam>0).every(p=>p.role!=='주전'),'AI 캡 방출 선수는 주전이면 안 됨');
 });
 
 test('선수안(요구액)이 캡을 넘기면 제시 불가, 기록 없음',()=>{

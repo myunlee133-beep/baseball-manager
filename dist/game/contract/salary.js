@@ -2,6 +2,7 @@
 import {teams,teamPlayers} from '../../model.js'; // 순환 import: 함수 안에서만 쓴다
 import {seasonLine} from '../league-season.js';
 import {FIN,ovrValue,serviceFactor,serviceYears,canAfford,hash01,domesticPayroll} from './finance.js';
+import {toFreeAgent} from './release.js';
 
 export const SALARY={
   perfWeight:.4,minPA:100,minIP:30,
@@ -86,7 +87,7 @@ function aiCapRelease(state,team){
     const p=teamPlayers(state,team).filter(x=>!x.foreign).sort((a,b)=>a.ovr-b.ovr)[0];
     if(!p)break;
     state.league[team]=state.league[team].filter(x=>x.id!==p.id);
-    (o.freeAgents??=[]).push({...p,group:'second',fromTeam:team,contract:null});
+    (o.freeAgents??=[]).push(toFreeAgent(p,team));
     o.log.push(`${teams[team]} ${p.name} 방출(캡 초과)`);
   }
 }
