@@ -43,15 +43,17 @@ export const negotiable=(p,year)=>!p.foreign&&p.contract?.years===1&&p.faYear!==
 
 const record=o=>(o.salary??={});
 export function offerSalary(state,id,offer){
+  if(!Number.isFinite(offer))return {ok:false,reason:'제시액을 숫자로 입력해 주세요.'};
+  offer=round100(offer);
   const o=state.offseason,p=state.players.find(x=>x.id===id);
   if(!o||o.step!=='salary')return {ok:false,reason:'연봉 협상 단계가 아닙니다.'};
   if(!p||!negotiable(p,o.year))return {ok:false,reason:'협상 대상이 아닙니다.'};
   if(record(o)[id])return {ok:false,reason:'이미 협상을 마친 선수입니다.'};
   const floor=cutFloor(p.contract.salary);
   if(offer<floor)return {ok:false,reason:`삭감 한도(${floor.toLocaleString('ko-KR')}만) 아래로 제시할 수 없습니다.`};
-  const check=canAfford(state,0,{salary:offer,replacing:p.contract.salary});
-  if(!check.ok)return check;
   const demand=demandSalary(p,o.year,leaguePerf(state,o.year));
+  const check=canAfford(state,0,{salary:Math.max(offer,demand),replacing:p.contract.salary});
+  if(!check.ok)return {ok:false,reason:offer>=demand?check.reason:`선수안(요구액)이 채택되면 ${check.reason}`};
   let result='accepted',salary=offer;
   if(offer<demand&&hash01(`${o.year}:${id}:accept`)>=acceptChance(offer/demand)){
     result=hash01(`${o.year}:${id}:arbitration`)<SALARY.clubWins?'club':'player';

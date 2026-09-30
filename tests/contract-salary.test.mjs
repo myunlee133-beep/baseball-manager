@@ -93,3 +93,20 @@ test('AI는 전원 요구액 수용, 캡을 넘으면 OVR 낮은 국내 선수�
   assert.ok(domesticPayroll(s.league[3])<=s.finance.cap);
   assert.ok(s.offseason.freeAgents.some(p=>p.fromTeam===3));
 });
+
+test('선수안(요구액)이 캡을 넘기면 제시 불가, 기록 없음',()=>{
+  const s=off(),perf=leaguePerf(s,2026);
+  const p=s.players.find(x=>{if(!negotiable(x,2026))return false;const d=demandSalary(x,2026,perf);return d>cutFloor(x.contract.salary)+300&&d>x.contract.salary;});
+  const d=demandSalary(p,2026,perf),offer=Math.max(cutFloor(p.contract.salary),d-300);
+  s.finance.cap=domesticPayroll(s.players)-p.contract.salary+offer+100;
+  const r=offerSalary(s,p.id,offer);
+  assert.equal(r.ok,false);
+  assert.match(r.reason,/선수안/);
+  assert.equal(s.offseason.salary[p.id],undefined);
+});
+
+test('제시액이 숫자가 아니면 거부',()=>{
+  const s=off(),p=s.players.find(x=>negotiable(x,2026));
+  const r=offerSalary(s,p.id,NaN);
+  assert.deepEqual([r.ok,r.reason],[false,'제시액을 숫자로 입력해 주세요.']);
+});
