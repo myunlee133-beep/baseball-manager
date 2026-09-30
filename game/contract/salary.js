@@ -69,6 +69,16 @@ export function acceptAllDemands(state){
   for(const p of state.players)if(negotiable(p,o.year)&&!record(o)[p.id]){const d=demandSalary(p,o.year,perf);record(o)[p.id]={demand:d,result:'demand',salary:d};n++;}
   return n;
 }
+/** ③이 끝났을 때의 내 팀 국내 연봉 합(상태 변경 없음). 캡 검사용. */
+export function projectedPayroll(state){
+  const o=state.offseason,year=o.year,perf=leaguePerf(state,year);
+  return state.players.reduce((s,p)=>{
+    if(p.foreign||!p.contract)return s;
+    const r=o.salary?.[p.id];
+    if(r)return s+r.salary;
+    return s+(negotiable(p,year)||(p.faYear===year&&p.contract.years===1)?demandSalary(p,year,perf):p.contract.salary);
+  },0);
+}
 /** AI가 캡을 넘으면 OVR 낮은 국내 선수부터 자유계약 시장으로(최소 규칙). */
 function aiCapRelease(state,team){
   const o=state.offseason;

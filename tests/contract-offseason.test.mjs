@@ -5,6 +5,8 @@ import {ensureSeason,hooks,closeSeason,ageLeague,prepareNextSeason} from '../gam
 import {STEPS,beginOffseason,nextStep,rosterProblems} from '../game/contract/offseason.js';
 import {offseasonMarkup} from '../offseason-ui.js';
 import {releasePlayer} from '../game/contract/release.js';
+import {negotiable,projectedPayroll} from '../game/contract/salary.js';
+import {stepBlock} from '../game/contract/offseason.js';
 
 const ended=()=>{const s=ensureSeason(initialState());s.season.phase='ended';return s;};
 
@@ -141,8 +143,8 @@ test('② 화면: 은퇴 목록과 내 팀 방출 버튼, ⑥ 화면: 자유계�
 
 test('② 탭을 지난 단계에서 다시 열면 방출 버튼이 없다',()=>{
   const s=ended();
-  beginOffseason(s);nextStep(s);nextStep(s);
-  assert.equal(s.offseason.step,'salary');
+  beginOffseason(s);nextStep(s);nextStep(s);nextStep(s);
+  assert.equal(s.offseason.step,'fa');
   const panel=(t,b)=>`<section><h2>${t}</h2>${b}</section>`;
   assert.doesNotMatch(offseasonMarkup(s,{tab:'retire',panel,standingsTable:()=>''}),/data-release=/);
 });
@@ -152,4 +154,47 @@ test('새 시즌 뉴스에 오프시즌 은퇴 한 줄이 남는다',()=>{
   beginOffseason(s);
   while(s.offseason)nextStep(s);
   assert.ok(s.season.news.some(l=>/오프시즌 은퇴/.test(l)));
+});
+
+test('③: 노화 전 OVR 기록, 떠날 때 연봉 확정(대상은 보류 1년)',()=>{
+  const s=ended();
+  beginOffseason(s);nextStep(s);nextStep(s);
+  assert.equal(s.offseason.step,'salary');
+  const mine=s.players.filter(p=>!p.foreign);
+  assert.ok(mine.every(p=>typeof s.offseason.ovrBefore[p.id]==='number'));
+  const target=mine.find(p=>negotiable(p,2026));
+  nextStep(s);
+  assert.equal(s.offseason.step,'fa');
+  assert.equal(target.contract.years,1);
+  assert.equal(target.contract.kind,'reserve');
+  assert.equal(s.offseason.salary[target.id].result,'demand');
+});
+
+test('③ 화면: 요구액 표, 제시 입력·버튼, 전원 수용 버튼, 끝난 선수는 결과 표시',()=>{
+  const s=ended();
+  beginOffseason(s);nextStep(s);nextStep(s);
+  const panel=(t,b)=>`<section><h2>${t}</h2>${b}</section>`,opts={tab:null,panel,standingsTable:()=>''};
+  const id=s.players.find(p=>negotiable(p,2026)).id;
+  const html=offseasonMarkup(s,opts);
+  assert.match(html,/요구액/);
+  assert.match(html,new RegExp(`data-offer-input="${id}"`));
+  assert.match(html,new RegExp(`data-offer="${id}"`));
+  assert.match(html,/data-action="acceptall"/);
+  s.offseason.salary={[id]:{demand:5000,result:'accepted',offer:5000,salary:5000}};
+  assert.doesNotMatch(offseasonMarkup(s,opts),new RegExp(`data-offer="${id}"`));
+});
+
+test('③ 캡: 캡 초과면 다음 단계 불가, 방출하면 통과',()=>{
+  const s=ended();
+  beginOffseason(s);nextStep(s);nextStep(s);
+  const pay=projectedPayroll(s),cap=s.finance.cap;
+  s.finance.cap=pay-1;
+  assert.equal(nextStep(s),false);
+  assert.match(stepBlock(s),/캡 초과/);
+  assert.equal(s.offseason.step,'salary');
+  const p=s.players.filter(x=>!x.foreign).sort((a,b)=>b.contract.salary-a.contract.salary)[0];
+  assert.equal(releasePlayer(s,p.id),true);
+  assert.equal(stepBlock(s),null);
+  assert.equal(nextStep(s),true);
+  s.finance.cap=cap;
 });
