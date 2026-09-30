@@ -110,3 +110,10 @@ test('제시액이 숫자가 아니면 거부',()=>{
   const r=offerSalary(s,p.id,NaN);
   assert.deepEqual([r.ok,r.reason],[false,'제시액을 숫자로 입력해 주세요.']);
 });
+
+test('삭감 하한은 최저 연봉 밑으로 내려가지 않는다',()=>{
+  assert.equal(cutFloor(3000),FIN.minSalary);
+  const s=off(),p=s.players.find(x=>negotiable(x,2026));
+  p.contract.salary=3000;
+  assert.match(offerSalary(s,p.id,2100).reason,/삭감 한도/);
+});

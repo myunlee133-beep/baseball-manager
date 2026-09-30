@@ -32,7 +32,7 @@ export function playerValue(p,year,perf){
   const perfValue=Math.max(0,(50+8*z-45)/5),k=SALARY.perfWeight*w;
   return base*(1-k)+perfValue*k;
 }
-export const cutFloor=prev=>round100(prev*(1-(prev>=SALARY.cutCap.line?SALARY.cutCap.big:SALARY.cutCap.small)));
+export const cutFloor=prev=>Math.max(FIN.minSalary,round100(prev*(1-(prev>=SALARY.cutCap.line?SALARY.cutCap.big:SALARY.cutCap.small))));
 export function demandSalary(p,year,perf){
   const fair=Math.max(FIN.minSalary,playerValue(p,year,perf)*FIN.marketUnit*serviceFactor(serviceYears(p))),prev=p.contract.salary;
   const raw=fair>=prev?prev+(fair-prev)*SALARY.raise:Math.max(cutFloor(prev),prev-(prev-fair)*SALARY.cut);
