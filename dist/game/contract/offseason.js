@@ -6,6 +6,7 @@ import {settleIncome,money} from './finance.js';
 import {settleSalaries,projectedPayroll} from './salary.js';
 import {beginFA,endFA,FA} from './fa.js';
 import {beginForeign,closeForeign} from './foreign.js';
+import {maybeOpenDraft,autoPick,joinDraftees} from './draft.js';
 import {FILL} from './league-fill.js';
 import {runRetirements,aiReleaseOverflow,ageFreeAgents,retireUnsigned} from './release.js';
 
@@ -15,6 +16,8 @@ export const STEP_LABELS={close:'시즌 마감',retire:'은퇴·방출',salary:'
 export function beginOffseason(state){
   if(state.season.phase!=='ended'||state.offseason)return false;
   const order=standings(state).map(r=>r.team),year=state.season.year;
+  maybeOpenDraft(state,{force:true});if(!state.draft.done)autoPick(state,{untilMine:false}); // 미처리 드래프트는 AI 규칙으로 마무리
+  state.prevFinalOrder=order; // 다음 드래프트 지명 순서
   settleIncome(state,order);
   for(const f of Object.values(state.finance.teams))f.extra=0; // FA 보상금 가감은 시즌 단위
   closeSeason(state);
@@ -61,5 +64,6 @@ export function nextStep(state){
   o.step=STEPS[STEPS.indexOf(o.step)+1];
   if(o.step==='retire')runRetirements(state);
   if(o.step==='foreign')beginForeign(state);
+  if(o.step==='roster'){const n=joinDraftees(state);if(n)o.log.push(`신인 ${n}명 합류`);}
   return true;
 }

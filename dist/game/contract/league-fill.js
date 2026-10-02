@@ -22,20 +22,20 @@ export const FILL={
 };
 const HIT_POS=['C','1B','2B','3B','SS','LF','CF','RF'];
 const RECORD_KEYS=['pa','ab','h','hr','bb','k','doubles','triples','sb','attempts','rbi','avg','obp','slg','ops','babip','iso','bbRate','kRate','g','gs','w','l','sv','hld','outs','ip','ha','r','er','hp','era','whip','k9','bb9','war'];
-const SURNAME='김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민진나'.split('');
-const GIVEN='민준서지현우도윤태영성호재진수빈건하은승찬시훈동규원석형탁범'.split('');
+export const SURNAME='김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민진나'.split('');
+export const GIVEN='민준서지현우도윤태영성호재진수빈건하은승찬시훈동규원석형탁범'.split('');
 const F_FIRST=['제이크','라이언','마이클','케빈','타일러','브랜든','카를로스','호세','루이스','다니엘','저스틴','애런'];
 const F_LAST=['밀러','존슨','로페즈','가르시아','윌슨','마르티네스','스미스','테일러','브라운','에르난데스','클라크','라미레스'];
 
 // 루트 engine.js의 rngFrom과 같은 mulberry32. engine.js는 dist에 복사되지 않아 여기 둔다
 export const rngFrom=seed=>{let a=seed>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};};
-const between=(rng,[lo,hi])=>lo+Math.floor(rng()*(hi-lo+1));
-const pick=(rng,a)=>a[Math.floor(rng()*a.length)];
+export const between=(rng,[lo,hi])=>lo+Math.floor(rng()*(hi-lo+1));
+export const pick=(rng,a)=>a[Math.floor(rng()*a.length)];
 // 1단계 초기 POT 공식의 성장 여지(scripts/kbo-2026/roster.mjs)와 같은 값
 const growth=age=>age<=20?25:age===21?22:age===22?18:age===23?14:age===24?11:age===25?7:age===26?4:0;
 
 /** 모양 범위에서 능력치를 뽑아 OVR이 목표 범위에 들 때까지 다시 뽑는다. */
-function sampleRatings(rng,pitcher,pos,shape,[lo,hi],tweak=r=>r){
+export function sampleRatings(rng,pitcher,pos,shape,[lo,hi],tweak=r=>r){
   for(let n=0;n<500;n++){
     const ratings=tweak(Object.fromEntries(Object.entries(shape).map(([k,r])=>[k,between(rng,r)])));
     const o=ovr({pitcher,pos,ratings});
@@ -43,7 +43,7 @@ function sampleRatings(rng,pitcher,pos,shape,[lo,hi],tweak=r=>r){
   }
   throw new Error(`능력치 생성 실패: ${pos} OVR ${lo}~${hi}`);
 }
-function makePlayer(rng,base){
+export function makePlayer(rng,base){
   const p={name:'',group:'second',role:null,faYear:null,lastSeason:null,energy:100,no:'',injury:'',days:0,...Object.fromEntries(RECORD_KEYS.map(k=>[k,0])),...base,[base.pitcher?'throws':'bats']:rng()<.3?'L':'R'};
   p.ovr=ovr(p);
   return p;
