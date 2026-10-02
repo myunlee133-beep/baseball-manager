@@ -28,7 +28,7 @@ const F_FIRST=['제이크','라이언','마이클','케빈','타일러','브랜�
 const F_LAST=['밀러','존슨','로페즈','가르시아','윌슨','마르티네스','스미스','테일러','브라운','에르난데스','클라크','라미레스'];
 
 // 루트 engine.js의 rngFrom과 같은 mulberry32. engine.js는 dist에 복사되지 않아 여기 둔다
-const rngFrom=seed=>{let a=seed>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};};
+export const rngFrom=seed=>{let a=seed>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};};
 const between=(rng,[lo,hi])=>lo+Math.floor(rng()*(hi-lo+1));
 const pick=(rng,a)=>a[Math.floor(rng()*a.length)];
 // 1단계 초기 POT 공식의 성장 여지(scripts/kbo-2026/roster.mjs)와 같은 값
@@ -58,19 +58,24 @@ function makeDepth(rng,roster,teamIndex,n){
   p.pot=potCap(p.ovr+growth(age)+between(rng,[-7,7]),p.ovr);
   return p;
 }
-function makeForeign(rng,teamIndex,{slot,pitcher,ovr:band,usd},n){
+/** 외국인 선수 기본형(팀·계약 없음). 시작 배정과 외국인 시장 후보가 같이 쓴다. */
+export function foreignCandidate(rng,{pitcher,band,id}){
   const pos=pitcher?'SP':pick(rng,FILL.foreignPos);
   // 구속이 빠를수록 제구가 약간 낮다
   const tweak=r=>pitcher?{...r,control:Math.max(20,r.control-Math.round((r.velocity-60)*.3))}:r;
   const ratings=sampleRatings(rng,pitcher,pos,FILL.foreignShape[pitcher?'pitcher':'hitter'],band,tweak);
-  const dollars=Math.round(usd*(1+(rng()*2-1)*FILL.usdSpread));
-  const p=makePlayer(rng,{id:`${teamIndex}-f${n}`,name:`${pick(rng,F_FIRST)} ${pick(rng,F_LAST)}`,team:teams[teamIndex],teamIndex,pitcher,pos,role:pitcher?'SP':'주전',age:between(rng,FILL.foreignAge),ratings,foreign:true,
-    contract:{salary:Math.round(dollars*10000*FIN.krwPerUsd),years:1,kind:'foreign',usd:dollars},slot}); // FIN은 순환 import라 모듈 최상위가 아닌 여기서 읽는다
+  const p=makePlayer(rng,{id,name:`${pick(rng,F_FIRST)} ${pick(rng,F_LAST)}`,team:'',teamIndex:null,pitcher,pos,role:pitcher?'SP':'주전',age:between(rng,FILL.foreignAge),ratings,foreign:true});
   p.pot=p.ovr;
   return p;
 }
+function makeForeign(rng,teamIndex,{slot,pitcher,ovr:band,usd},n){
+  const p=foreignCandidate(rng,{pitcher,band,id:`${teamIndex}-f${n}`});
+  const dollars=Math.round(usd*(1+(rng()*2-1)*FILL.usdSpread));
+  Object.assign(p,{team:teams[teamIndex],teamIndex,contract:{salary:Math.round(dollars*10000*FIN.krwPerUsd),years:1,kind:'foreign',usd:dollars},slot}); // FIN은 순환 import라 모듈 최상위가 아닌 여기서 읽는다
+  return p;
+}
 /** 1군에 외국인을 넣은 만큼 같은 유형 최저 OVR 국내 선수를 2군으로 내리고, 외국인 선발 수만큼 원래 SP 보직을 RP로 바꿔 로테이션 5명을 유지한다. */
-function makeRoom(roster,foreigners){
+export function makeRoom(roster,foreigners){
   for(const f of foreigners){
     if(f.pitcher){
       const sp=roster.filter(p=>!p.foreign&&p.group==='first'&&p.role==='SP').sort((a,b)=>a.ovr-b.ovr)[0];
