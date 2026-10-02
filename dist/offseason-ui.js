@@ -7,6 +7,7 @@ import {FILL} from './game/contract/league-fill.js';
 import {negotiable,demandSalary,leaguePerf,cutFloor} from './game/contract/salary.js';
 import {askingSalary} from './game/contract/release.js';
 import {FA} from './game/contract/fa.js';
+import {FOREIGN,scoutOvrRange,poolStrength} from './game/contract/foreign.js';
 
 // 사용액/한도. 90% 초과 --gold, 초과 --red (DESIGN.md 5-2)
 const usage=(used,max)=>{const r=used/max,c=r>1?'var(--red)':r>.9?'var(--gold)':'var(--text)';return `<strong style="color:${c};font-variant-numeric:tabular-nums">${money(used)}</strong> <span class="muted">/ ${money(max)}</span>`;};
@@ -26,6 +27,31 @@ function stepBody(state,step,{standingsTable,problems}){
     const r=o.retired??[],mine=r.filter(x=>x.team===0);
     const list=r.length?`<p>${r.map(x=>`${x.team===0?'<strong>':''}${teams[x.team]} ${x.name}(${x.age}세, OVR ${x.ovr})${x.team===0?'</strong>':''}`).join(' · ')}</p>`:'<p class="muted">은퇴 선수가 없습니다.</p>';
     return `<div class="offnote"><p><strong>은퇴 선수 ${r.length}명</strong>${mine.length?` · ${teams[0]} ${mine.length}명`:''}</p>${list}<p class="muted">방출한 선수는 자유계약 시장으로 가고, 오프시즌이 끝날 때까지 계약하지 못하면 은퇴합니다. 방출은 되돌릴 수 없습니다.</p></div>${releaseTable(state)}`;
+  }
+  if(step==='foreign'){
+    const f=o.foreign;
+    if(!f)return '<div class="empty">외국인 시장이 아직 열리지 않았습니다.</div>';
+    const live=o.step==='foreign'&&!f.closed;
+    const mine=state.players.filter(p=>p.foreign);
+    const usdTxt=u=>`${u}만 달러`;
+    const resign=playerTable(mine,[['선수',p=>p.name],['구분',p=>p.pitcher?'투수':'타자'],['나이',p=>p.age],['OVR',p=>p.ovr],['올해',p=>p.contract?usdTxt(p.contract.usd):'-'],['재계약 요구',p=>f.resign[p.id]?usdTxt(f.resign[p.id].ask):'-']],p=>{
+      const r=f.resign[p.id];
+      if(!r)return '신규 계약';
+      if(r.decision==='keep')return '재계약';
+      if(!live)return '-';
+      return `<button class="secondary" data-fx-keep="${p.id}">재계약</button> <button class="secondary" data-fx-release="${p.id}">포기</button>`;
+    },'외국인 선수가 없습니다.');
+    const scoutCell=c=>{const [lo,hi]=scoutOvrRange(c);return c.signedBy!==undefined?`${c.player.ovr} <span class="muted">(적응 ${c.player.adapt>0?'+':''}${c.player.adapt})</span>`:`${lo}~${hi}`;};
+    const rows=[...f.pool].sort((a,b)=>(b.signedBy===0)-(a.signedBy===0)||scoutOvrRange(b)[1]-scoutOvrRange(a)[1]);
+    const market=playerTable(rows,[['후보',c=>c.player.name],['구분',c=>c.player.pitcher?'투수':c.player.pos],['나이',c=>c.player.age],['OVR(스카우팅)',scoutCell],['요구',c=>usdTxt(c.ask)]],c=>{
+      if(c.signedBy!==undefined)return `<strong>${teams[c.signedBy]}</strong> ${usdTxt(c.usd)}`;
+      if(!live)return '미계약';
+      const m=f.mine[c.id];
+      return `<input type="number" step="1" min="1" max="${FOREIGN.newCapUsd}" value="${m??c.ask}" data-fx-usd="${c.id}" aria-label="${c.player.name} 제시액(만 달러)" style="width:64px"><span class="muted">만$</span> <button class="secondary" data-fx-offer="${c.id}">${m?'수정':'제시'}</button>${m?` <button class="secondary" data-fx-cancel="${c.id}">취소</button>`:''}`;
+    },'후보가 없습니다.');
+    const head=`<div class="offnote"><p><strong>외국인 계약</strong> · 올해 시장 ${f.pool.length}명(${FOREIGN.strength[poolStrength(o.year)].label}) · 내 외국인 ${mine.length}/${FOREIGN.slots} · 제시 ${Object.keys(f.mine).length}건</p><p class="muted">팀당 ${FOREIGN.slots}명(투수·타자 각 최대 ${FOREIGN.maxSame}명), 신규 첫해 ${FOREIGN.newCapUsd}만 달러 이하, 연봉은 캡에서 빠지고 예산에서 차감(1달러 1,400원). 후보 능력은 스카우팅 범위로만 보이며, 계약하는 순간 KBO 적응 보정(−8~+4, 실패가 더 흔함)이 붙어 실제 능력이 정해집니다. 요구액의 90% 이상을 제시해야 하고, 여러 구단이 원하면 더 높은 금액이 이깁니다. 시장을 마감하면 결정하지 않은 내 외국인은 재계약됩니다.</p>${live?'<p><button class="secondary" data-action="fxclose">시장 마감</button></p>':''}</div>`;
+    const log=f.log.length?`<div class="offnote"><p><strong>계약 결과</strong></p>${f.log.slice(-10).reverse().map(l=>`<p>${l}</p>`).join('')}</div>`:'';
+    return `${head}<div class="offnote"><p><strong>내 외국인 재계약</strong></p></div>${resign}<div class="offnote"><p><strong>외국인 시장</strong></p></div>${market}${log}`;
   }
   if(step==='fa'){
     const fa=o.fa;

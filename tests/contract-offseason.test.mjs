@@ -6,11 +6,12 @@ import {STEPS,beginOffseason,nextStep,rosterProblems} from '../game/contract/off
 import {offseasonMarkup} from '../offseason-ui.js';
 import {releasePlayer} from '../game/contract/release.js';
 import {runFaRound} from '../game/contract/fa.js';
+import {closeForeign} from '../game/contract/foreign.js';
 import {negotiable,projectedPayroll} from '../game/contract/salary.js';
 import {stepBlock} from '../game/contract/offseason.js';
 
-// ④ FA는 3라운드를 모두 진행해야 넘어갈 수 있다
-const advance=(s,stop)=>{while(s.offseason&&s.offseason.step!==stop){if(s.offseason.step==='fa')for(let i=0;i<3;i++)runFaRound(s);if(!nextStep(s))break;}};
+// ④ FA는 3라운드, ⑤ 외국인은 시장 마감을 해야 넘어갈 수 있다
+const advance=(s,stop)=>{while(s.offseason&&s.offseason.step!==stop){if(s.offseason.step==='fa')for(let i=0;i<3;i++)runFaRound(s);if(s.offseason.step==='foreign')closeForeign(s);if(!nextStep(s))break;}};
 const ended=()=>{const s=ensureSeason(initialState());s.season.phase='ended';return s;};
 
 test('시즌 마감은 성적만 보관하고 나이는 그대로',()=>{
@@ -56,7 +57,7 @@ test('①~⑥ 진행: 수입 정산, 노화는 ②→③에서 한 번, 끝나�
     assert.equal(s.finance.teams[s.offseason.finalOrder[0]].income,200000);
     assert.equal(s.finance.teams[s.offseason.finalOrder[9]].income,20000);
     const seen=[s.offseason.step];
-    while(s.offseason&&s.offseason.step!=='roster'){if(s.offseason.step==='fa')for(let i=0;i<3;i++)runFaRound(s);assert.equal(nextStep(s),true);seen.push(s.offseason.step);if(s.offseason.step==='salary')assert.equal(p.age,age+1);}
+    while(s.offseason&&s.offseason.step!=='roster'){if(s.offseason.step==='fa')for(let i=0;i<3;i++)runFaRound(s);if(s.offseason.step==='foreign')closeForeign(s);assert.equal(nextStep(s),true);seen.push(s.offseason.step);if(s.offseason.step==='salary')assert.equal(p.age,age+1);}
     assert.deepEqual(seen,STEPS);
     assert.equal(calls,1);
     assert.equal(nextStep(s),true);

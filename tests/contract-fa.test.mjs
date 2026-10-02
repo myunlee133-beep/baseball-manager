@@ -4,6 +4,7 @@ import {initialState,teams,teamPlayers} from '../model.js';
 import {ensureSeason,allPlayers} from '../game/league-season.js';
 import {FA,beginFA,runFaRound,offerFa,endFA,compensation,durationPref,offerScore,contenderBonus} from '../game/contract/fa.js';
 import {beginOffseason,nextStep,stepBlock} from '../game/contract/offseason.js';
+import {closeForeign} from '../game/contract/foreign.js';
 import {teamFinance,domesticPayroll} from '../game/contract/finance.js';
 
 const ended=()=>{const s=ensureSeason(initialState());s.season.phase='ended';return s;};
@@ -143,6 +144,7 @@ test('FA 전체를 거쳐 새 시즌까지: 55명 이하, 캡 이내, 시장에 
   beginOffseason(s);
   while(s.offseason){
     if(s.offseason.step==='fa'){for(let i=0;i<3;i++)runFaRound(s);}
+    if(s.offseason.step==='foreign')closeForeign(s);
     if(!nextStep(s)&&s.offseason?.step==='roster')break;
   }
   assert.equal(s.season.year,2027);
