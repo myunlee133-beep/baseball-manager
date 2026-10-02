@@ -59,6 +59,24 @@ export function signFreeAgent(state,id){
   o.log.push(`${teams[0]} ${p.name} 영입(자유계약)`);
   return {ok:true,reason:''};
 }
+export const AI_FILL=50; // AI 구단이 ⑥에서 채우는 최소 인원
+/** ⑥을 떠날 때 AI 구단이 ${AI_FILL}명이 될 때까지 자유계약 시장에서 OVR 높은 국내 선수를 요구 연봉으로 영입한다(캡·예산 검사). 최소 규칙, 게임성 단계에서 교체. */
+export function aiFillRoster(state){
+  const o=state.offseason;let n=0;
+  for(let team=1;team<teams.length;team++){
+    while(teamPlayers(state,team).length<AI_FILL){
+      const pool=(o.freeAgents??=[]).filter(p=>!p.foreign).sort((a,b)=>b.ovr-a.ovr);
+      const p=pool.find(x=>canAfford(state,team,{salary:askingSalary(x)}).ok);
+      if(!p)break;
+      o.freeAgents.splice(o.freeAgents.indexOf(p),1);
+      const {fromTeam,...rest}=p;
+      state.league[team].push({...rest,team:teams[team],teamIndex:team,group:'second',contract:{salary:askingSalary(p),years:1,kind:'reserve'}});
+      n++;
+    }
+  }
+  if(n)o.log.push(`AI 구단 자유계약 영입 ${n}명`);
+  return n;
+}
 /** AI 구단이 55명을 넘으면 OVR 낮은 국내 선수부터 방출한다(최소 규칙, 게임성 단계에서 교체). */
 export function aiReleaseOverflow(state){
   const o=state.offseason;let n=0;

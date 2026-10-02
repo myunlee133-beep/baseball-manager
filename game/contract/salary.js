@@ -83,7 +83,7 @@ export function projectedPayroll(state){
   },0);
 }
 /** AI가 캡을 넘으면 OVR 낮은 국내 선수부터 자유계약 시장으로(최소 규칙). */
-function aiCapRelease(state,team){
+export function aiCapRelease(state,team){
   const o=state.offseason;
   while(domesticPayroll(teamPlayers(state,team))>state.finance.cap){
     const p=teamPlayers(state,team).filter(x=>!x.foreign).sort((a,b)=>a.ovr-b.ovr)[0];

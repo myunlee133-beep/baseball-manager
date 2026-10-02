@@ -136,3 +136,7 @@ test('⑤ 화면: 재계약 버튼, 스카우팅 범위, 제시 칸, 마감 버�
   assert.match(html,/계약 결과/);
   assert.match(html,/적응 [+-]?\d/);
 });
+
+test('시장 풀은 여러 해 생성해도 실패하지 않는다(최상위 등급 중견수 등)',()=>{
+  for(let year=2026;year<2060;year++)assert.ok(buildPool(year).length>=16,String(year));
+});
