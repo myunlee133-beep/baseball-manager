@@ -5,9 +5,12 @@ import {ensureSeason,hooks,closeSeason,ageLeague,prepareNextSeason} from '../gam
 import {STEPS,beginOffseason,nextStep,rosterProblems} from '../game/contract/offseason.js';
 import {offseasonMarkup} from '../offseason-ui.js';
 import {releasePlayer} from '../game/contract/release.js';
+import {runFaRound} from '../game/contract/fa.js';
 import {negotiable,projectedPayroll} from '../game/contract/salary.js';
 import {stepBlock} from '../game/contract/offseason.js';
 
+// ④ FA는 3라운드를 모두 진행해야 넘어갈 수 있다
+const advance=(s,stop)=>{while(s.offseason&&s.offseason.step!==stop){if(s.offseason.step==='fa')for(let i=0;i<3;i++)runFaRound(s);if(!nextStep(s))break;}};
 const ended=()=>{const s=ensureSeason(initialState());s.season.phase='ended';return s;};
 
 test('시즌 마감은 성적만 보관하고 나이는 그대로',()=>{
@@ -53,7 +56,7 @@ test('①~⑥ 진행: 수입 정산, 노화는 ②→③에서 한 번, 끝나�
     assert.equal(s.finance.teams[s.offseason.finalOrder[0]].income,200000);
     assert.equal(s.finance.teams[s.offseason.finalOrder[9]].income,20000);
     const seen=[s.offseason.step];
-    while(s.offseason&&s.offseason.step!=='roster'){assert.equal(nextStep(s),true);seen.push(s.offseason.step);if(s.offseason.step==='salary')assert.equal(p.age,age+1);}
+    while(s.offseason&&s.offseason.step!=='roster'){if(s.offseason.step==='fa')for(let i=0;i<3;i++)runFaRound(s);assert.equal(nextStep(s),true);seen.push(s.offseason.step);if(s.offseason.step==='salary')assert.equal(p.age,age+1);}
     assert.deepEqual(seen,STEPS);
     assert.equal(calls,1);
     assert.equal(nextStep(s),true);
@@ -67,8 +70,8 @@ test('①~⑥ 진행: 수입 정산, 노화는 ②→③에서 한 번, 끝나�
 test('내 팀이 55명을 넘으면 새 시즌으로 넘어가지 않는다',()=>{
   const s=ended();
   beginOffseason(s);
-  while(s.offseason.step!=='roster')nextStep(s);
-  for(let i=0;i<6;i++)s.players.push({...structuredClone(s.players.at(-1)),id:`0-extra-${i}`});
+  advance(s,'roster');
+  for(let i=0;s.players.length<=55;i++)s.players.push({...structuredClone(s.players.at(-1)),id:`0-extra-${i}`}); // FA로 빠진 인원이 많아 55명을 넘도록 채운다
   const n=s.players.length;
   assert.deepEqual(rosterProblems(s).over,[{team:0,count:n}]);
   assert.equal(nextStep(s),false);
@@ -79,7 +82,7 @@ test('내 팀이 55명을 넘으면 새 시즌으로 넘어가지 않는다',()=
 test('AI 구단이 55명을 넘으면 ⑥을 떠날 때 자동 방출되고, 시장에 남은 선수는 은퇴한다',()=>{
   const s=ended();
   beginOffseason(s);
-  while(s.offseason.step!=='roster')nextStep(s);
+  advance(s,'roster');
   for(let i=0;i<6;i++)s.league[3].push({...structuredClone(s.league[3].at(-1)),id:`3-extra-${i}`,ovr:99});
   const log=s.offseason.log;
   assert.equal(nextStep(s),true);
@@ -120,7 +123,7 @@ test('오프시즌 화면: 현재 단계 CTA, 앞 단계 잠금, 끝난 단계 �
   assert.match(html,/2026 오프시즌 · 2\. 은퇴·방출/);
   assert.match(html,/샐러리캡/);
   assert.doesNotMatch(html,/generated/);
-  while(s.offseason.step!=='roster')nextStep(s);
+  advance(s,'roster');
   assert.match(offseasonMarkup(s,{tab:null,panel,standingsTable:()=>''}),/새 시즌 시작/);
 });
 
@@ -134,7 +137,7 @@ test('② 화면: 은퇴 목록과 내 팀 방출 버튼, ⑥ 화면: 자유계�
   assert.match(two,new RegExp(`data-release="${s.players.at(-1).id}"`));
   const id=s.players.at(-1).id;
   releasePlayer(s,id);
-  while(s.offseason.step!=='roster')nextStep(s);
+  advance(s,'roster');
   const six=offseasonMarkup(s,opts);
   assert.match(six,/자유계약 시장/);
   assert.match(six,new RegExp(`data-sign="${id}"`));
@@ -152,7 +155,7 @@ test('② 탭을 지난 단계에서 다시 열면 방출 버튼이 없다',()=>
 test('새 시즌 뉴스에 오프시즌 은퇴 한 줄이 남는다',()=>{
   const s=ended();
   beginOffseason(s);
-  while(s.offseason)nextStep(s);
+  advance(s,null);
   assert.ok(s.season.news.some(l=>/오프시즌 은퇴/.test(l)));
 });
 

@@ -16,7 +16,7 @@ export function retireChance(p){
   return Math.min(1,base*f);
 }
 /** 팀에서 선수를 뺀다. 내 팀은 movePlayer로 라인업·로테이션·불펜에서 먼저 정리한다. */
-function removeFromTeam(state,team,id){
+export function removeFromTeam(state,team,id){
   if(team===0){movePlayer(state,id,'second');state.players=state.players.filter(p=>p.id!==id);}
   else state.league[team]=state.league[team].filter(p=>p.id!==id);
 }

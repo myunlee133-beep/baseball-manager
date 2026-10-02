@@ -4,6 +4,7 @@ import {standings,closeSeason,ageLeague,prepareNextSeason} from '../league-seaso
 import {teams,teamPlayers,positions} from '../../model.js';
 import {settleIncome,money} from './finance.js';
 import {settleSalaries,projectedPayroll} from './salary.js';
+import {beginFA,endFA,FA} from './fa.js';
 import {FILL} from './league-fill.js';
 import {runRetirements,aiReleaseOverflow,ageFreeAgents,retireUnsigned} from './release.js';
 
@@ -14,6 +15,7 @@ export function beginOffseason(state){
   if(state.season.phase!=='ended'||state.offseason)return false;
   const order=standings(state).map(r=>r.team),year=state.season.year;
   settleIncome(state,order);
+  for(const f of Object.values(state.finance.teams))f.extra=0; // FA 보상금 가감은 시즌 단위
   closeSeason(state);
   state.offseason={step:'close',year,finalOrder:order,log:[`${year} 시즌 종료 · 1위 ${teams[order[0]]}`],freeAgents:[],retired:[]};
   return true;
@@ -22,6 +24,7 @@ export function beginOffseason(state){
 export function stepBlock(state){
   const o=state.offseason;
   if(o?.step==='salary'){const over=projectedPayroll(state)-state.finance.cap;if(over>0)return `캡 초과 ${money(over)} — 선수를 방출하거나 낮게 제시해 주세요.`;}
+  if(o?.step==='fa'&&o.fa&&o.fa.round<FA.rounds)return `FA 라운드를 모두 진행해 주세요 (${o.fa.round}/${FA.rounds})`;
   if(o?.step==='roster'&&rosterProblems(state).over.some(t=>t.team===0))return `로스터 ${FILL.max}명을 넘었습니다.`;
   return null;
 }
@@ -49,7 +52,9 @@ export function nextStep(state){
   }
   if(o.step==='salary'&&stepBlock(state))return false;
   if(o.step==='retire'){aiReleaseOverflow(state);o.ovrBefore=Object.fromEntries(state.players.filter(p=>!p.foreign).map(p=>[p.id,p.ovr]));ageLeague(state);ageFreeAgents(state);o.log.push('선수단 나이 +1 · 성장·노화 반영');}
-  if(o.step==='salary')settleSalaries(state);
+  if(o.step==='salary'){beginFA(state);settleSalaries(state);}
+  if(o.step==='fa'&&stepBlock(state))return false;
+  if(o.step==='fa')endFA(state);
   o.step=STEPS[STEPS.indexOf(o.step)+1];
   if(o.step==='retire')runRetirements(state);
   return true;

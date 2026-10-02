@@ -78,7 +78,8 @@ export function projectedPayroll(state){
     if(p.foreign||!p.contract)return s;
     const r=o.salary?.[p.id];
     if(r)return s+r.salary;
-    return s+(negotiable(p,year)||(p.faYear===year&&p.contract.years===1)?demandSalary(p,year,perf):p.contract.salary);
+    if(p.faYear===year&&p.contract.years===1)return s; // FA 시장으로 나가므로 확정 총연봉에서 제외(④에서 재계약하면 그때 캡 검사)
+    return s+(negotiable(p,year)?demandSalary(p,year,perf):p.contract.salary);
   },0);
 }
 /** AI가 캡을 넘으면 OVR 낮은 국내 선수부터 자유계약 시장으로(최소 규칙). */
@@ -92,7 +93,7 @@ function aiCapRelease(state,team){
     o.log.push(`${teams[team]} ${p.name} 방출(캡 초과)`);
   }
 }
-/** ③을 떠날 때: 내 팀 미처리 수용, 전 구단 대상 확정, 다년 1년 차감, FA 자격자 임시 재계약(PR 4 전), AI 캡 초과 방출. */
+/** ③을 떠날 때: 내 팀 미처리 수용, 전 구단 대상 확정, 다년 1년 차감, AI 캡 초과 방출. FA 자격자는 settle 전에 beginFA가 시장으로 옮겨 둔다. */
 export function settleSalaries(state){
   const o=state.offseason,year=o.year,perf=leaguePerf(state,year);
   acceptAllDemands(state);
@@ -102,7 +103,6 @@ export function settleSalaries(state){
       if(team===0&&record(o)[p.id]){p.contract={salary:record(o)[p.id].salary,years:1,kind:'reserve'};continue;}
       if(p.contract.years>1){p.contract.years-=1;continue;}
       const d=demandSalary(p,year,perf);
-      if(p.faYear===year)p.faYear=year+FIN.refaSeasons; // PR 4(FA)에서 시장으로 교체
       p.contract={salary:d,years:1,kind:'reserve'};
     }
     if(team>0)aiCapRelease(state,team);
