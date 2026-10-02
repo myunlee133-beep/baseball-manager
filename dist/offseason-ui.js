@@ -6,6 +6,7 @@ import {teamFinance,money} from './game/contract/finance.js';
 import {FILL} from './game/contract/league-fill.js';
 import {negotiable,demandSalary,leaguePerf,cutFloor} from './game/contract/salary.js';
 import {askingSalary} from './game/contract/release.js';
+import {FA} from './game/contract/fa.js';
 
 // 사용액/한도. 90% 초과 --gold, 초과 --red (DESIGN.md 5-2)
 const usage=(used,max)=>{const r=used/max,c=r>1?'var(--red)':r>.9?'var(--gold)':'var(--text)';return `<strong style="color:${c};font-variant-numeric:tabular-nums">${money(used)}</strong> <span class="muted">/ ${money(max)}</span>`;};
@@ -25,6 +26,23 @@ function stepBody(state,step,{standingsTable,problems}){
     const r=o.retired??[],mine=r.filter(x=>x.team===0);
     const list=r.length?`<p>${r.map(x=>`${x.team===0?'<strong>':''}${teams[x.team]} ${x.name}(${x.age}세, OVR ${x.ovr})${x.team===0?'</strong>':''}`).join(' · ')}</p>`:'<p class="muted">은퇴 선수가 없습니다.</p>';
     return `<div class="offnote"><p><strong>은퇴 선수 ${r.length}명</strong>${mine.length?` · ${teams[0]} ${mine.length}명`:''}</p>${list}<p class="muted">방출한 선수는 자유계약 시장으로 가고, 오프시즌이 끝날 때까지 계약하지 못하면 은퇴합니다. 방출은 되돌릴 수 없습니다.</p></div>${releaseTable(state)}`;
+  }
+  if(step==='fa'){
+    const fa=o.fa;
+    if(!fa)return '<div class="empty">FA 시장이 아직 열리지 않았습니다.</div>';
+    const live=o.step==='fa'&&fa.round<FA.rounds;
+    const rows=[...fa.pool].sort((a,b)=>(a.fromTeam===0?0:1)-(b.fromTeam===0?0:1)||b.player.ovr-a.player.ovr);
+    const status=e=>e.signedBy!==undefined?`<strong>${teams[e.signedBy]}</strong> ${e.years}년 ${money(e.salary)}`:fa.mine[e.id]?`내 제시 ${fa.mine[e.id].years}년 ${money(fa.mine[e.id].salary)}`:live?'':'미계약';
+    const action=e=>{
+      if(e.signedBy!==undefined||!live)return status(e)||'-';
+      const m=fa.mine[e.id],st=status(e);
+      return `${st?`<span class="muted">${st}</span> `:''}<select data-fa-years="${e.id}" aria-label="${e.player.name} 기간">${[1,2,3,4].map(y=>`<option value="${y}" ${(m?.years??(e.player.age>=30?3:2))===y?'selected':''}>${y}년</option>`).join('')}</select><input type="number" step="100" min="3000" value="${m?.salary??e.ask}" data-fa-salary="${e.id}" aria-label="${e.player.name} 연봉(만 원)" style="width:82px"><span class="muted">만</span> <button class="secondary" data-fa-offer="${e.id}">제시</button>`;
+    };
+    const table=playerTable(rows,[['선수',e=>e.player.name],['원소속',e=>teams[e.fromTeam]],['나이',e=>e.player.age],['OVR',e=>e.player.ovr],['등급',e=>e.grade],['요구액',e=>money(e.ask)]],action,'FA 자격자가 없습니다.');
+    const mineOwn=fa.pool.filter(e=>e.fromTeam===0).length;
+    const header=`<div class="offnote"><p><strong>${fa.round}/${FA.rounds} 라운드</strong> · 자격자 ${fa.pool.length}명(내 팀 ${mineOwn}명) · 계약 ${fa.pool.filter(e=>e.signedBy!==undefined).length}명</p><p class="muted">선수는 라운드마다 최고 제안을 보고 수락하거나 다음 라운드를 기다립니다(앞 라운드일수록 더 높은 조건을 요구). 원소속팀 +10%, 지난 시즌 순위가 높은 팀 최대 +10% 가산이 붙고, 30세 이상은 긴 계약을 27세 이하는 짧은 계약을 선호합니다. 구단당 외부 FA는 최대 ${FA.maxExternal}명, A·B등급을 영입하면 원소속팀에 보상금(A 직전 연봉 300%, B 200%)을 내고, 예산이 모자라면 보호선수 ${FA.protect}명 밖 최고 OVR 1명을 대신 보내고 보상금(A 200%·B 150%)을 냅니다. 미계약 선수는 ⑥ 자유계약 시장으로 갑니다.</p>${live?`<p><button class="secondary" data-action="faround">${fa.round+1}라운드 진행</button></p>`:''}</div>`;
+    const log=fa.log.length?`<div class="offnote"><p><strong>계약 결과</strong></p>${fa.log.slice(-12).reverse().map(l=>`<p>${l}</p>`).join('')}</div>`:'';
+    return `${header}${table}${log}`;
   }
   if(step==='salary'){
     const rec=o.salary??{},perf=leaguePerf(state,o.year),before=o.ovrBefore??{},live=o.step==='salary';

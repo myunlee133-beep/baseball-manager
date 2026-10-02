@@ -72,7 +72,7 @@ test('낮은 제시: 판정은 재현 가능, 거절이면 연봉조정으로 �
   }
 });
 
-test('전원 수용과 확정: 대상은 요구액 보류 1년, 다년은 1년 줄고, FA 자격자는 재계약·재자격 +4, 외국인 그대로',()=>{
+test('전원 수용과 확정: 대상은 요구액 보류 1년, 다년은 1년 줄고, FA 자격자는 건드리지 않고(④가 처리), 외국인 그대로',()=>{
   const s=off();
   let multi=s.players.find(p=>p.contract?.years>1);
   let fa=s.players.find(p=>!p.foreign&&p.faYear===2026&&p.contract.years===1);
@@ -80,6 +80,7 @@ test('전원 수용과 확정: 대상은 요구액 보류 1년, 다년은 1년 �
   if(!multi){const d=s.players.find(p=>!p.foreign);d.contract={salary:10000,years:3,kind:'fa'};multi=d;}
   if(!fa){const d=s.players.find(p=>!p.foreign&&!multi||p.id!==multi.id);d.faYear=2026;d.contract={salary:5000,years:1,kind:'reserve'};fa=d;}
   const multiYears=multi.contract.years,foreignC=structuredClone(foreign.contract);
+  const faBefore=structuredClone({faYear:fa.faYear,contract:fa.contract});
   const n=acceptAllDemands(s);
   assert.ok(n>0);
   assert.ok(Object.values(s.offseason.salary).every(r=>r.result==='demand'));
@@ -88,8 +89,7 @@ test('전원 수용과 확정: 대상은 요구액 보류 1년, 다년은 1년 �
   assert.ok(multi,'다년 계약 선수 없음');
   assert.equal(multi.contract.years,multiYears-1);
   assert.ok(fa,'FA 자격 선수 없음');
-  assert.equal(fa.faYear,2030);
-  assert.equal(fa.contract.years,1);
+  assert.deepEqual({faYear:fa.faYear,contract:fa.contract},faBefore);
   assert.deepEqual(foreign.contract,foreignC);
 });
 

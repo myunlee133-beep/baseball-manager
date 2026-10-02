@@ -52,7 +52,7 @@ export const foreignPayroll=players=>players.reduce((s,p)=>s+(p.foreign?p.contra
 export const createFinance=()=>({cap:FIN.cap,teams:Object.fromEntries(teams.map((_,i)=>[i,{support:FIN.support[i],income:FIN.firstYearIncome}]))});
 
 export function teamFinance(state,i){
-  const players=teamPlayers(state,i),f=state.finance.teams[i],dom=domesticPayroll(players),fx=foreignPayroll(players),budget=f.support+f.income;
+  const players=teamPlayers(state,i),f=state.finance.teams[i],dom=domesticPayroll(players),fx=foreignPayroll(players),budget=f.support+f.income+(f.extra??0);
   return {cap:state.finance.cap,capUsed:dom,capRoom:state.finance.cap-dom,budget,budgetUsed:dom+fx,budgetRoom:budget-dom-fx,count:players.length};
 }
 /** 계약을 맺으면 캡·예산을 넘는지. replacing은 이 계약으로 사라지는 기존 연봉(재계약 등). */
