@@ -8,7 +8,7 @@ import {beginFA,endFA,FA} from './fa.js';
 import {beginForeign,closeForeign} from './foreign.js';
 import {maybeOpenDraft,autoPick,joinDraftees} from './draft.js';
 import {FILL} from './league-fill.js';
-import {runRetirements,aiReleaseOverflow,ageFreeAgents,retireUnsigned} from './release.js';
+import {runRetirements,aiReleaseOverflow,aiFillRoster,ageFreeAgents,retireUnsigned} from './release.js';
 
 export const STEPS=['close','retire','salary','fa','foreign','roster'];
 export const STEP_LABELS={close:'시즌 마감',retire:'은퇴·방출',salary:'연봉 협상',fa:'FA',foreign:'외국인 계약',roster:'로스터 확정'};
@@ -47,6 +47,7 @@ export function nextStep(state){
   if(!o)return false;
   o.freeAgents??=[];
   if(o.step==='roster'){
+    aiFillRoster(state);
     aiReleaseOverflow(state);
     for(let team=1;team<teams.length;team++)aiCapRelease(state,team); // 신인 합류로 캡을 넘으면 정리
     if(rosterProblems(state).over.length||stepBlock(state))return false;

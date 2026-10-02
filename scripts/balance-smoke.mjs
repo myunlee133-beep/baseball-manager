@@ -11,7 +11,7 @@ import {runFaRound} from '../game/contract/fa.js';
 import {closeForeign} from '../game/contract/foreign.js';
 import {autoPick,draftPending,maybeOpenDraft} from '../game/contract/draft.js';
 import {releasePlayer} from '../game/contract/release.js';
-import {domesticPayroll,teamFinance,money,FIN} from '../game/contract/finance.js';
+import {domesticPayroll,teamFinance,money,FIN,fairSalary} from '../game/contract/finance.js';
 
 const store=new Map();
 globalThis.localStorage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
@@ -60,8 +60,10 @@ function report(year,log){
   const faMoved=log.filter(l=>/^FA 계약/.test(l)).length;
   const cohort=Object.entries(cohorts).map(([y,ids])=>{const c=ps.filter(p=>ids.includes(p.id));return `${y}:${c.length}명 OVR ${f1(mean(c.map(p=>p.ovr)))} (55+ ${c.filter(p=>p.ovr>=55).length})`;}).join(' | ');
   console.log(`\n== ${year} 오프시즌 뒤 (${year+1} 개막 전) ==`);
-  console.log(`선수 ${ps.length}명 · 평균 나이 ${f1(mean(ps.map(p=>p.age)))} · 40세+ ${ps.filter(p=>p.age>=40).length} · 1군 OVR ${f1(mean(firsts.map(p=>p.ovr)))} · 상위 10명 OVR ${f1(mean(top.slice(0,10).map(p=>p.ovr)))} · OVR 70+ ${ps.filter(p=>p.ovr>=70).length} · POT 80 ${ps.filter(p=>p.pot>=80).length}`);
+  console.log(`선수 ${ps.length}명 · 상위276 OVR ${f1(mean(top.slice(0,276).map(p=>p.ovr)))} · 평균 나이 ${f1(mean(ps.map(p=>p.age)))} · 40세+ ${ps.filter(p=>p.age>=40).length} · 1군 OVR ${f1(mean(firsts.map(p=>p.ovr)))} · 상위 10명 OVR ${f1(mean(top.slice(0,10).map(p=>p.ovr)))} · OVR 70+ ${ps.filter(p=>p.ovr>=70).length} · POT 80 ${ps.filter(p=>p.pot>=80).length}`);
   console.log(`외국인 ${fx.length}명 OVR ${f1(mean(fx.map(p=>p.ovr)))} · 상위 30명 중 외국인 ${top.slice(0,30).filter(p=>p.foreign).length}명 · 국내 상위 10명 OVR ${f1(mean(dom.slice().sort((a,b)=>b.ovr-a.ovr).slice(0,10).map(p=>p.ovr)))}`);
+  const fair=teams.map((_,i)=>teamPlayers(s,i).filter(p=>!p.foreign).reduce((x,p)=>x+fairSalary(p),0)),kinds={};for(const p of dom)kinds[p.contract?.kind]=(kinds[p.contract?.kind]??0)+p.contract.salary;
+  console.log(`적정 연봉 합 평균 ${money(mean(fair))} · 계약 종류별 연봉 합(리그) ${Object.entries(kinds).map(([k,v])=>`${k} ${money(v)}`).join(' / ')}`);
   console.log(`국내 총연봉 최소 ${money(Math.min(...pay))} 평균 ${money(mean(pay))} 최대 ${money(Math.max(...pay))} (캡 ${money(FIN.cap)}, 90%+ ${pay.filter(v=>v>=FIN.cap*.9).length}팀) · 예산 여유 최소 ${money(Math.min(...budgetRoom))} · 로스터 ${Math.min(...sizes)}~${Math.max(...sizes)}명`);
   console.log(`은퇴 ${retire} · FA 자격 ${faOpen}명 중 계약 ${faMoved} · AI 방출 ${n(/AI 구단 방출|방출\(캡 초과\)/)}건 · 외국인 재계약 포기 ${n(/외국인 .* 재계약 포기/)}명 · 미계약 은퇴 ${(log.find(l=>/미계약 자유계약 선수/.test(l))??'').match(/(\d+)명/)?.[1]??0}`);
   if(cohort)console.log(`드래프트 코호트: ${cohort}`);

@@ -110,3 +110,19 @@ test('외국인 방출 선수는 자유계약 시장에서 영입할 수 없다'
   assert.ok(s.offseason.freeAgents.some(p=>p.id===f.id));
   assert.ok(!s.players.some(p=>p.id===f.id));
 });
+
+import {aiFillRoster,AI_FILL} from '../game/contract/release.js';
+test('AI 로스터 채우기: 50명 미만 AI는 시장에서 OVR 높은 국내 선수를 영입, 내 팀·외국인은 제외',()=>{
+  const s=off('roster');
+  s.league[4]=s.league[4].slice(0,45);
+  const mine=s.players.length;
+  const pool=[...s.league[6].splice(-8)].map(p=>({...p,fromTeam:6,contract:null}));
+  s.offseason.freeAgents.push(...pool,{...pool[0],id:'fx-test',foreign:true,ovr:99});
+  const n=aiFillRoster(s);
+  assert.ok(n>=5);
+  assert.equal(s.league[4].length,AI_FILL);
+  assert.ok(s.offseason.freeAgents.some(p=>p.id==='fx-test'),'외국인은 영입하지 않음');
+  assert.equal(s.players.length,mine);
+  const signed=s.league[4].slice(45);
+  assert.ok(signed.every(p=>p.teamIndex===4&&p.contract.kind==='reserve'&&!('fromTeam' in p)));
+});

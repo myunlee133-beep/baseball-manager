@@ -55,7 +55,7 @@ function makeDepth(rng,roster,teamIndex,n){
   const age=between(rng,FILL.depthAge);
   const ratings=sampleRatings(rng,pitcher,pos,FILL.depthShape[pitcher?'pitcher':'hitter'],FILL.depthOvr);
   const p=makePlayer(rng,{id:`${teamIndex}-g${n}`,name:pick(rng,SURNAME)+pick(rng,GIVEN)+pick(rng,GIVEN),team:teams[teamIndex],teamIndex,pitcher,pos,age,ratings,generated:true});
-  p.pot=potCap(p.ovr+growth(age)+between(rng,[-7,7]),p.ovr);
+  p.pot=potCap(p.ovr+Math.round(growth(age)*.5)+between(rng,[-7,7]),p.ovr); // 가상 2군 뎁스는 성장 여지를 실제 선수의 절반으로(밸런스 스모크)
   return p;
 }
 /** 외국인 선수 기본형(팀·계약 없음). 시작 배정과 외국인 시장 후보가 같이 쓴다. */

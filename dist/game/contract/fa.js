@@ -13,7 +13,8 @@ export const FA={
   market:.6,askFloor:.7,                     // 요구액 = max(가치 × 시장단가 × .6, 직전 연봉 × .7)
   hold:[1.05,1,.95],                         // 라운드별 선수가 받아들이는 점수 배수(앞 라운드일수록 더 요구)
   homeBonus:.10,contenderBonus:.10,durationStep:.06,
-  aiPremium:[.95,1.2],                       // AI 구단 제시액 = 요구액 × (0.95 ~ 1.20, 구단·선수별 해시)
+  aiPremium:[.95,1.2],
+  keepRoster:50,                             // AI 원소속팀은 인원이 이보다 적으면 OVR과 무관하게 재계약 제시                       // AI 구단 제시액 = 요구액 × (0.95 ~ 1.20, 구단·선수별 해시)
 };
 const round100=v=>Math.round(v/100)*100;
 const aiYears=p=>p.age>=30?3:2;
@@ -106,7 +107,7 @@ export function runFaRound(state){
   for(const [id,m] of Object.entries(fa.mine))if(offers.has(id))offers.get(id).push({team:0,...m});
   const aiOffer=(team,e)=>({team,years:aiYears(e.player),salary:round100(e.ask*(FA.aiPremium[0]+(FA.aiPremium[1]-FA.aiPremium[0])*hash01(`${year}:${team}:${e.id}:prem`)))});
   for(let team=1;team<teams.length;team++){
-    for(const e of open().filter(e=>e.fromTeam===team&&e.player.ovr>=45))offers.get(e.id).push(aiOffer(team,e)); // 원소속팀 재계약 시도
+    for(const e of open().filter(e=>e.fromTeam===team&&(e.player.ovr>=45||teamPlayers(state,team).length<FA.keepRoster)))offers.get(e.id).push(aiOffer(team,e)); // 원소속팀 재계약 시도(인원이 모자라면 OVR과 무관하게)
     const t=teamFinance(state,team);
     const target=open().filter(e=>e.fromTeam!==team&&e.player.ovr>=50&&e.ask<=t.capRoom).sort((a,b)=>b.player.ovr-a.player.ovr)[0]; // 외부 영입: 여유 안에서 최고 OVR 1명
     if(target)offers.get(target.id).push(aiOffer(team,target));
