@@ -6,6 +6,8 @@ test('금액 표기(만 원 단위)',()=>{
   assert.equal(money(3000),'3,000만');
   assert.equal(money(12000),'1.2억');
   assert.equal(money(1400000),'140억');
+  assert.equal(money(-12000),'-1.2억');
+  assert.equal(money(-3000),'-3,000만');
 });
 
 test('가치와 연차 계수',()=>{

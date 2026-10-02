@@ -20,7 +20,7 @@ function removeFromTeam(state,team,id){
   if(team===0){movePlayer(state,id,'second');state.players=state.players.filter(p=>p.id!==id);}
   else state.league[team]=state.league[team].filter(p=>p.id!==id);
 }
-const toFreeAgent=(p,team)=>({...p,group:'second',role:p.pitcher?null:p.role==='주전'?'벤치':p.role,fromTeam:team,contract:null});
+export const toFreeAgent=(p,team)=>({...p,group:'second',role:p.pitcher?null:p.role==='주전'?'벤치':p.role,fromTeam:team,contract:null});
 
 /** ①→② 때 리그 전체 은퇴 판정. 같은 해·같은 선수면 결과가 같다. */
 export function runRetirements(state){
@@ -37,7 +37,7 @@ export function runRetirements(state){
 }
 export function releasePlayer(state,id){
   const o=state.offseason,p=state.players.find(x=>x.id===id);
-  if(!o||!['retire','roster'].includes(o.step)||!p)return false;
+  if(!o||!['retire','salary','roster'].includes(o.step)||!p)return false;
   removeFromTeam(state,0,id);
   (o.freeAgents??=[]).push(toFreeAgent(p,0));
   o.log.push(`${teams[0]} ${p.name} 방출`);

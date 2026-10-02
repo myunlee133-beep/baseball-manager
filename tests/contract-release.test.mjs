@@ -38,8 +38,8 @@ test('내 팀 선수가 은퇴하면 라인업·로테이션에서도 빠진다'
   assert.ok(!s.rotation.includes(sp));
 });
 
-test('방출: ②·⑥에서만, 내 팀에서 빠져 시장으로(원소속·계약 없음), 캡 사용액 감소',()=>{
-  const s=off('salary'),id=s.order.find(x=>!s.players.find(p=>p.id===x).foreign); // 외국인은 캡에 안 잡히므로 국내 주전
+test('방출: ②·③·⑥에서만, 내 팀에서 빠져 시장으로(원소속·계약 없음), 캡 사용액 감소',()=>{
+  const s=off('fa'),id=s.order.find(x=>!s.players.find(p=>p.id===x).foreign); // 외국인은 캡에 안 잡히므로 국내 주전
   assert.equal(releasePlayer(s,id),false);
   s.offseason.step='retire';
   const before=domesticPayroll(s.players);
