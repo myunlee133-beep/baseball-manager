@@ -60,10 +60,13 @@ function makeDepth(rng,roster,teamIndex,n){
 }
 /** 외국인 선수 기본형(팀·계약 없음). 시작 배정과 외국인 시장 후보가 같이 쓴다. */
 export function foreignCandidate(rng,{pitcher,band,id}){
-  const pos=pitcher?'SP':pick(rng,FILL.foreignPos);
+  let pos=pitcher?'SP':pick(rng,FILL.foreignPos);
   // 구속이 빠를수록 제구가 약간 낮다
   const tweak=r=>pitcher?{...r,control:Math.max(20,r.control-Math.round((r.velocity-60)*.3))}:r;
-  const ratings=sampleRatings(rng,pitcher,pos,FILL.foreignShape[pitcher?'pitcher':'hitter'],band,tweak);
+  const shape=FILL.foreignShape[pitcher?'pitcher':'hitter'];
+  let ratings;
+  try{ratings=sampleRatings(rng,pitcher,pos,shape,band,tweak);}
+  catch{pos='DH';ratings=sampleRatings(rng,pitcher,pos,shape,band,tweak);} // 중견수 등 수비 비중이 큰 포지션은 능력치 범위로 최상위 등급(OVR 74+)에 못 닿는다
   const p=makePlayer(rng,{id,name:`${pick(rng,F_FIRST)} ${pick(rng,F_LAST)}`,team:'',teamIndex:null,pitcher,pos,role:pitcher?'SP':'주전',age:between(rng,FILL.foreignAge),ratings,foreign:true});
   p.pot=p.ovr;
   return p;

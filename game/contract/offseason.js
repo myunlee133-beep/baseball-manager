@@ -2,8 +2,8 @@
 /** 오프시즌 단계 진행. 시즌 종료(phase 'ended') 뒤 ①~⑥을 거쳐 다음 시즌 개막 전으로 넘어간다. 상태는 제자리 변경한다. */
 import {standings,closeSeason,ageLeague,prepareNextSeason} from '../league-season.js';
 import {teams,teamPlayers,positions} from '../../model.js';
-import {settleIncome,money} from './finance.js';
-import {settleSalaries,projectedPayroll} from './salary.js';
+import {settleIncome,money,domesticPayroll} from './finance.js';
+import {settleSalaries,projectedPayroll,aiCapRelease} from './salary.js';
 import {beginFA,endFA,FA} from './fa.js';
 import {beginForeign,closeForeign} from './foreign.js';
 import {maybeOpenDraft,autoPick,joinDraftees} from './draft.js';
@@ -31,6 +31,7 @@ export function stepBlock(state){
   if(o?.step==='fa'&&o.fa&&o.fa.round<FA.rounds)return `FA 라운드를 모두 진행해 주세요 (${o.fa.round}/${FA.rounds})`;
   if(o?.step==='foreign'&&o.foreign&&!o.foreign.closed)return '외국인 시장을 마감해 주세요.';
   if(o?.step==='roster'&&rosterProblems(state).over.some(t=>t.team===0))return `로스터 ${FILL.max}명을 넘었습니다.`;
+  if(o?.step==='roster'){const over=domesticPayroll(state.players)-state.finance.cap;if(over>0)return `캡 초과 ${money(over)} — 선수를 방출해 주세요.`;}
   return null;
 }
 export function rosterProblems(state){
@@ -47,7 +48,8 @@ export function nextStep(state){
   o.freeAgents??=[];
   if(o.step==='roster'){
     aiReleaseOverflow(state);
-    if(rosterProblems(state).over.length)return false;
+    for(let team=1;team<teams.length;team++)aiCapRelease(state,team); // 신인 합류로 캡을 넘으면 정리
+    if(rosterProblems(state).over.length||stepBlock(state))return false;
     retireUnsigned(state);
     const ret=o.retired??[],n=ret.length,year=o.year;
     prepareNextSeason(state);

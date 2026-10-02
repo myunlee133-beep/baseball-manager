@@ -4,7 +4,7 @@ import {initialState,teams,teamPlayers} from '../model.js';
 import {ensureSeason,finishDay} from '../game/league-season.js';
 import {DRAFT,draftDate,buildDraftPool,draftStrength,maybeOpenDraft,draftPending,onClock,pickProspect,autoPick,joinDraftees} from '../game/contract/draft.js';
 import {advance} from '../game/season-runner.js';
-import {beginOffseason,nextStep} from '../game/contract/offseason.js';
+import {beginOffseason,nextStep,stepBlock} from '../game/contract/offseason.js';
 import {runFaRound} from '../game/contract/fa.js';
 import {closeForeign} from '../game/contract/foreign.js';
 import {releasePlayer} from '../game/contract/release.js';
@@ -105,4 +105,18 @@ test('드래프트 전에 시즌이 끝나도 오프시즌 시작에서 드래�
   assert.equal(s.draft.done,true);
   assert.equal(s.draft.picks.length,70);
   assert.deepEqual(s.prevFinalOrder,s.offseason.finalOrder);
+});
+
+import {domesticPayroll} from '../game/contract/finance.js';
+test('⑥에서 신인 합류로 캡을 넘으면: AI는 떠날 때 정리, 내 팀은 방출 전까지 진행 불가',()=>{
+  const s=fresh();s.season.date='2026-09-14';maybeOpenDraft(s);autoPick(s,{untilMine:false});
+  s.season.phase='ended';beginOffseason(s);
+  while(s.offseason.step!=='roster'){if(s.offseason.step==='fa')for(let i=0;i<3;i++)runFaRound(s);if(s.offseason.step==='foreign')closeForeign(s);nextStep(s);}
+  while(s.players.length>55)releasePlayer(s,s.players.find(p=>!p.foreign).id);
+  s.finance.cap=domesticPayroll(s.players)-1;
+  assert.match(stepBlock(s),/캡 초과/);
+  assert.equal(nextStep(s),false);
+  releasePlayer(s,[...s.players].filter(p=>!p.foreign).sort((a,b)=>b.contract.salary-a.contract.salary)[0].id);
+  assert.equal(nextStep(s),true);
+  for(const t of teams.keys())assert.ok(domesticPayroll(teamPlayers(s,t))<=s.finance.cap,teams[t]);
 });
