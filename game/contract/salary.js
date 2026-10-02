@@ -8,7 +8,7 @@ export const SALARY={
   perfWeight:.4,minPA:100,minIP:30,
   raise:.6,cut:.5,cutCap:{big:.4,small:.3,line:10000}, // 삭감 상한: 1억 이상 40% · 미만 30%
   accept:[[.95,.85],[.90,.60],[.85,.35],[.80,.15]],   // 제시/요구 비율 → 수락 확률
-  clubWins:.7,                                        // 연봉조정 구단안 채택 확률
+  clubWins:[[.90,.70],[.80,.50],[0,.30]],             // 연봉조정 구단안 채택 확률: 제시/요구 비율이 낮을수록 낮아짐
 };
 const round100=v=>Math.round(v/100)*100;
 const mean=a=>a.reduce((s,x)=>s+x,0)/Math.max(1,a.length);
@@ -40,6 +40,7 @@ export function demandSalary(p,year,perf){
   return Math.max(FIN.minSalary,round100(raw));
 }
 export const acceptChance=ratio=>ratio>=1?1:(SALARY.accept.find(([min])=>ratio>=min-1e-9)?.[1]??0);
+export const clubChance=ratio=>SALARY.clubWins.find(([min])=>ratio>=min-1e-9)[1];
 export const negotiable=(p,year)=>!p.foreign&&p.contract?.years===1&&p.faYear!==year;
 
 const record=o=>(o.salary??={});
@@ -57,7 +58,7 @@ export function offerSalary(state,id,offer){
   if(!check.ok)return {ok:false,reason:offer>=demand?check.reason:`선수안(요구액)이 채택되면 ${check.reason}`};
   let result='accepted',salary=offer;
   if(offer<demand&&hash01(`${o.year}:${id}:accept`)>=acceptChance(offer/demand)){
-    result=hash01(`${o.year}:${id}:arbitration`)<SALARY.clubWins?'club':'player';
+    result=hash01(`${o.year}:${id}:arbitration`)<clubChance(offer/demand)?'club':'player';
     if(result==='player')salary=demand;
   }
   record(o)[id]={demand,offer,result,salary};

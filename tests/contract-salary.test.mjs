@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {initialState,teams,teamPlayers} from '../model.js';
 import {ensureSeason} from '../game/league-season.js';
-import {SALARY,leaguePerf,playerValue,demandSalary,cutFloor,acceptChance,negotiable,offerSalary,acceptAllDemands,settleSalaries} from '../game/contract/salary.js';
+import {SALARY,leaguePerf,playerValue,demandSalary,cutFloor,acceptChance,clubChance,negotiable,offerSalary,acceptAllDemands,settleSalaries} from '../game/contract/salary.js';
 import {ovrValue,FIN,domesticPayroll} from '../game/contract/finance.js';
 
 const off=()=>{const s=ensureSeason(initialState());s.offseason={step:'salary',year:2026,finalOrder:teams.map((_,i)=>i),log:[],freeAgents:[],retired:[],salary:{}};return s;};
@@ -124,4 +124,13 @@ test('삭감 하한은 최저 연봉 밑으로 내려가지 않는다',()=>{
   const s=off(),p=s.players.find(x=>negotiable(x,2026));
   p.contract.salary=3000;
   assert.match(offerSalary(s,p.id,2100).reason,/삭감 한도/);
+});
+
+test('연봉조정 구단안 채택률: 제시 비율이 낮을수록 낮다',()=>{
+  assert.equal(clubChance(.95),.70);
+  assert.equal(clubChance(.90),.70);
+  assert.equal(clubChance(.85),.50);
+  assert.equal(clubChance(.80),.50);
+  assert.equal(clubChance(.79),.30);
+  assert.equal(clubChance(.60),.30);
 });
