@@ -8,7 +8,7 @@ import {teams,teamPlayers,positions} from '../model.js';
 import {ensureDev,monthlyGrowth,offseasonGrowth} from './growth.js';
 
 /** 3단계 성장·퇴화 연결점. 테스트는 이 객체의 함수를 바꿔 끼운다. */
-export const hooks={monthlyTick:monthlyGrowth,offseasonTick:offseasonGrowth};
+export const hooks={monthlyTick:monthlyGrowth,offseasonTick:offseasonGrowth,dayTick:()=>{}}; // dayTick: 계약 시스템(드래프트)이 채운다
 
 const blankStats=()=>({batting:{},pitching:{}});
 export function createSeason(year){
@@ -81,6 +81,7 @@ export function finishDay(state){
   recoverDay(allPlayers(state),s.date);
   s.date=addDays(s.date,1);
   if(s.date.endsWith('-01'))hooks.monthlyTick(state);
+  hooks.dayTick(state);
   if(!s.schedule.some(g=>g.status==='scheduled'))s.phase='ended';
 }
 

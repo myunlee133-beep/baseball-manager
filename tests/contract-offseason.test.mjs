@@ -74,7 +74,7 @@ test('내 팀이 55명을 넘으면 새 시즌으로 넘어가지 않는다',()=
   advance(s,'roster');
   for(let i=0;s.players.length<=55;i++)s.players.push({...structuredClone(s.players.at(-1)),id:`0-extra-${i}`}); // FA로 빠진 인원이 많아 55명을 넘도록 채운다
   const n=s.players.length;
-  assert.deepEqual(rosterProblems(s).over,[{team:0,count:n}]);
+  assert.deepEqual(rosterProblems(s).over.filter(t=>t.team===0),[{team:0,count:n}]); // AI 초과(신인 합류)는 ⑥을 떠날 때 자동 방출
   assert.equal(nextStep(s),false);
   assert.equal(s.offseason.step,'roster');
   assert.equal(s.season.year,2026);
