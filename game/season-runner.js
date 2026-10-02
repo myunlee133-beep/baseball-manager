@@ -1,7 +1,8 @@
 // game/season-runner.js
-/** 여러 날 진행. 경기마다 브라우저에 양보해 진행률·중단이 동작하고, 하루가 끝날 때마다 저장한다. */
+/** 여러 날 진행. 경기마다 브라우저에 양보해 진행률·중단이 동작하고, 하루가 끝날 때마다 저장한다. 중요 메시지가 오면 그날 뒤 멈춘다. */
 import {addDays} from './league-schedule.js';
 import {todayGames,myGame,lineupProblem,playLeagueGame,finishDay,flushBoxes} from './league-season.js';
+import {pendingPopup} from './inbox.js';
 
 export function targetDate(state,unit){
   const {date,schedule}=state.season;
@@ -25,6 +26,7 @@ export async function advance(state,until,{onProgress=()=>{},shouldStop=()=>fals
     finishDay(state);
     flushBoxes(s.year);
     save(state);
+    if(pendingPopup(state).length)return {done,total,stopped:'message'};
     if(shouldStop())return {done,total,stopped:true};
   }
   return {done,total};
