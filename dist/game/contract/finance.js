@@ -19,6 +19,7 @@ export const FIN={
 };
 
 const hash=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/4294967296;};
+export const hash01=hash; // 재현 가능한 0~1 판정(은퇴 등)
 
 export const money=v=>v>=10000?`${Number((v/10000).toFixed(1))}억`:`${Math.round(v).toLocaleString('ko-KR')}만`;
 export const ovrValue=p=>Math.max(0,(p.ovr-45)/5);
